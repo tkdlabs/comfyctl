@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"log"
-	"maps"
 	"slices"
 	"strings"
 )
@@ -26,54 +25,75 @@ func FindPositivePrompt(workflow ComfyWorkflow) (string, error) {
    }
 
    // Look for inputs "positive" and walk back to "text"
-   for _, node := range workflow.Nodes {
-	   nodeInput, found := node.Inputs["positive"]
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["positive"]
 	   if !found {
 		   continue
 	   }
-	   if nodeInput.Type != ComfyNodeRef {
-		   log.Printf("Weird, 'positive' input is not a node ref, but %v", nodeInput.Type)
-		   continue
+	   prompt, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "positive", "prompt", "conditioning"},
+   			[]string{"ConditioningZeroOut"})
+	   if found {
+		   return prompt, nil
 	   }
-	   targetNode, found := workflow.Nodes[nodeInput.OutputPtr.NodeRef]
-	   if !found {
-		   log.Printf("Weird, 'positive' input node ref doesn't exist!")
-		   continue
-	   }
-	   for _, found := targetNode.Inputs["text"]; !found; {
-		   tn, found := targetNode.Inputs["positive"]
-		   if found {
-			   if tn.Type == ComfyNodeRef {
-				   ttn, found := workflow.Nodes[tn.OutputPtr.NodeRef]
-				   if found {
-					   targetNode = ttn
-					   continue
-				   }
-			   }
-		   }
-		   tn, found = targetNode.Inputs["prompt"]
-		   if found {
-			   if tn.Type == ComfyNodeRef {
-				   ttn, found := workflow.Nodes[tn.OutputPtr.NodeRef]
-				   if found {
-					   targetNode = ttn
-					   continue
-				   }
-			   }
-		   }
-		   break
-	   }
-	   targetNodeText, found := targetNode.Inputs["text"]
-	   if !found {
-		   all_attributes := slices.Collect(maps.Keys(targetNode.Inputs))
-		   log.Printf("Weird, 'positive' target input node doesn't have text attribute, instead it has: %v", all_attributes)
-		   continue
-	   }
-	   if targetNodeText.Type != ComfyTextInput {
-		   log.Printf("Weird, node with input 'text' is not string, but %v", targetNodeText.Type)
-		   continue
-	   }
-	   return targetNodeText.Text, nil
    }
    return "", errors.New("Unable to find positive prompt in the workflow")
+}
+
+func FindNegativePrompt(workflow ComfyWorkflow) (string, error) {
+
+   // Fuzzy search for node that has "Positive Prompt" in title
+   for _, node := range workflow.Nodes {
+	if strings.Contains(node.Title, "Negative Prompt") {
+		nodeInput, found := node.Inputs["text"]
+		if !found {
+			continue
+		}
+		if nodeInput.Type != ComfyTextInput {
+			log.Printf("Weird, node with input 'text' is not string, but %v", nodeInput.Type)
+			continue
+		}
+		return nodeInput.Text, nil
+	}
+   }
+
+   // Look for inputs "positive" and walk back to "text"
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["negative"]
+	   if !found {
+		   continue
+	   }
+	   prompt, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "negative", "prompt", "conditioning"},
+					   []string {"ConditioningZeroOut"})
+	   if found {
+		   return prompt, nil
+	   }
+   }
+   return "", errors.New("Unable to find negative prompt in the workflow")
+}
+func crawlUntilFoundText(workflow ComfyWorkflow, startNode string, followInputs []string, bannedClasses []string) (string, bool) {
+	currentNode, found := workflow.Nodes[startNode]
+	if !found {
+		return "", false
+	}
+	if slices.ContainsFunc(bannedClasses, func (class string) bool { return class == currentNode.ClassType  }) {
+		// dont follow nodes of 'banned classes'
+		return "", false
+	}
+	for _, inputKey := range followInputs {
+		inputEntry, found := currentNode.Inputs[inputKey]
+		if found {
+			if inputEntry.Type == ComfyTextInput {
+				// finish crawl, found text
+				return inputEntry.Text, true
+			}
+			if inputEntry.Type == ComfyNodeRef {
+				recursiveRes, found := crawlUntilFoundText(workflow, inputEntry.OutputPtr.NodeRef, followInputs,
+										bannedClasses)
+				if found {
+					return recursiveRes, true
+				}
+			}
+		}
+	}
+	return "", false
 }

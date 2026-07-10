@@ -23,11 +23,17 @@ func main () {
 	
 	// Find prompts
 	
-	_, err = FindPositivePrompt(cw)
+/*	posPrompt, err := FindPositivePrompt(cw)
 	if err != nil {
 		fmt.Printf("Failed to find positive prompt: %v\n", err)
 	} else {
-		fmt.Printf("Found positive prompt\n")//: %s\n", posPrompt)
+		fmt.Printf("Found positive prompt %s\n", posPrompt)//: %s\n", posPrompt)
+	}*/
+	negPrompt, err := FindNegativePrompt(cw)
+	if err != nil {
+		fmt.Printf("Failed to find negative prompt: %v\n", err)
+	} else {
+		fmt.Printf("Found negative prompt %s\n", negPrompt)//: %s\n", posPrompt)
 	}
 
 	// Find resolution
