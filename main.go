@@ -15,7 +15,7 @@ Commands:
   set		changes details about the workflow
   submit	submits the workflow to ComfyUI`
 
-func main () {
+func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, usage)
 		os.Exit(2)

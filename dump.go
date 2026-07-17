@@ -25,20 +25,20 @@ The following <What> attributes are supported. You can supply multiple <what>:
 func cmdDump(args []string) error {
 	var display map[string]struct{} = make(map[string]struct{})
 	if len(args) == 0 {
-		display["positive"] = struct{} {}
-		display["negative"] = struct{} {}
-		display["width"] = struct{} {}
-		display["height"] = struct{} {}
-		display["batch"] = struct{} {}
-		display["fps"] = struct{} {}
-		display["image"] = struct{} {}
-		display["seed"] = struct{} {}
+		display["positive"] = struct{}{}
+		display["negative"] = struct{}{}
+		display["width"] = struct{}{}
+		display["height"] = struct{}{}
+		display["batch"] = struct{}{}
+		display["fps"] = struct{}{}
+		display["image"] = struct{}{}
+		display["seed"] = struct{}{}
 	}
 	for _, arg := range args {
 		switch arg {
-		case "positive","negative","width","height","batch","fps","image", "seed":
-			display[arg] = struct{} {}
-		default: 
+		case "positive", "negative", "width", "height", "batch", "fps", "image", "seed":
+			display[arg] = struct{}{}
+		default:
 			return fmt.Errorf("Unknown artifact requested: %s\n\n%s", arg, dumpUsage)
 		}
 	}
@@ -55,7 +55,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find negative prompt: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(posPrompt)
+			val, _ := cw.Resolve(posPrompt)
 			fmt.Printf("Found positive prompt %s\n", val)
 		}
 	}
@@ -66,7 +66,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find negative prompt: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(negPrompt)
+			val, _ := cw.Resolve(negPrompt)
 			fmt.Printf("Found negative prompt %s\n", val)
 		}
 	}
@@ -77,7 +77,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find height: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(height)
+			val, _ := cw.Resolve(height)
 			intval, _ := val.(json.Number).Int64()
 			fmt.Printf("Found height: %d\n", intval)
 		}
@@ -89,7 +89,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find width: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(width)
+			val, _ := cw.Resolve(width)
 			intval, _ := val.(json.Number).Int64()
 			fmt.Printf("Found width: %d\n", intval)
 		}
@@ -101,7 +101,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find batch size: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(batch_size)
+			val, _ := cw.Resolve(batch_size)
 			intval, _ := val.(json.Number).Int64()
 			fmt.Printf("Found batch size: %d\n", intval)
 		}
@@ -113,7 +113,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find seed: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(seed)
+			val, _ := cw.Resolve(seed)
 			fmt.Printf("Found seed: %s\n", val.(json.Number).String())
 		}
 	}
@@ -124,7 +124,7 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find fps: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(fps)
+			val, _ := cw.Resolve(fps)
 			intval, _ := val.(json.Number).Int64()
 			fmt.Printf("Found fps: %d\n", intval)
 		}
@@ -136,12 +136,10 @@ func cmdDump(args []string) error {
 		if err != nil {
 			fmt.Printf("Failed to find source image: %v\n", err)
 		} else {
-			val, _  := cw.Resolve(imagesrc)
+			val, _ := cw.Resolve(imagesrc)
 			fmt.Printf("Found source image: %s\n", val)
 		}
 	}
 
 	return nil
 }
-
-

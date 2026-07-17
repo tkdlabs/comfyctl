@@ -11,14 +11,14 @@ import (
 type ComfyFormat int
 
 const (
-	Unknown  ComfyFormat = iota
+	Unknown ComfyFormat = iota
 	API
 	GUI // GUI is unsuitable to seding over /prompt endpoint
 )
 
 type ComfyWorkflow struct {
-	Raw   map[string]any
-	Nodes map[string]ComfyNode
+	Raw         map[string]any
+	Nodes       map[string]ComfyNode
 	NodesSynced bool
 }
 
@@ -61,7 +61,7 @@ func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
 	}
 	if input.Type != inputRef.inputType {
 		return nil, fmt.Errorf("Invalid InputRef, %s->%s input type mismatch: %v (expected) vs %v.",
-	inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type)
+			inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type)
 	}
 	switch input.Type {
 	case ComfyNumberInput:
@@ -77,57 +77,48 @@ func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
 }
 
 func (cw *ComfyWorkflow) SetString(inputRef InputRef, value string) error {
-	nodeRaw, found := cw.Raw[inputRef.nodeId]
-	if !found {
-		return fmt.Errorf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId)
+	inputMap, err := cw.getRawInputMap(inputRef)
+	if err != nil {
+		return err
 	}
-	nodeRawMap, ok := nodeRaw.(map[string]any)
-	if !ok {
-		return fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId)
-	}
-	inputMapRaw, found := nodeRawMap["inputs"]
-	if !found {
-		return fmt.Errorf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId)
-	}
-	inputMapRawMap, ok := inputMapRaw.(map[string]any)
-	if !ok {
-		return fmt.Errorf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId)
-	}
-	_, found = inputMapRawMap[inputRef.inputId]
-	if !found {
-		return fmt.Errorf("Internal error. Node %s has no %s input in raw format.",
-	inputRef.nodeId, inputRef.inputId)
-	}
-	inputMapRawMap[inputRef.inputId] = value
+	inputMap[inputRef.inputId] = value
 	cw.NodesSynced = false
 	return nil
 }
 
 func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
+	inputMap, err := cw.getRawInputMap(inputRef)
+	if err != nil {
+		return err
+	}
+	inputMap[inputRef.inputId] = json.Number(strconv.FormatInt(value, 10))
+	cw.NodesSynced = false
+	return nil
+}
+
+func (cw ComfyWorkflow) getRawInputMap(inputRef InputRef) (map[string]any, error) {
 	nodeRaw, found := cw.Raw[inputRef.nodeId]
 	if !found {
-		return fmt.Errorf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId)
+		return nil, fmt.Errorf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId)
 	}
 	nodeRawMap, ok := nodeRaw.(map[string]any)
 	if !ok {
-		return fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId)
+		return nil, fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId)
 	}
 	inputMapRaw, found := nodeRawMap["inputs"]
 	if !found {
-		return fmt.Errorf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId)
+		return nil, fmt.Errorf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId)
 	}
 	inputMapRawMap, ok := inputMapRaw.(map[string]any)
 	if !ok {
-		return fmt.Errorf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId)
+		return nil, fmt.Errorf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId)
 	}
 	_, found = inputMapRawMap[inputRef.inputId]
 	if !found {
-		return fmt.Errorf("Internal error. Node %s has no %s input in raw format.",
-	inputRef.nodeId, inputRef.inputId)
+		return nil, fmt.Errorf("Internal error. Node %s has no %s input in raw format.",
+			inputRef.nodeId, inputRef.inputId)
 	}
-	inputMapRawMap[inputRef.inputId] = json.Number(strconv.FormatInt(value, 10))
-	cw.NodesSynced = false
-	return nil
+	return inputMapRawMap, nil
 }
 
 func (cw ComfyWorkflow) WriteOut(writer io.Writer) error {
@@ -135,11 +126,11 @@ func (cw ComfyWorkflow) WriteOut(writer io.Writer) error {
 	return encoder.Encode(cw.Raw)
 }
 
-// Node 
+// Node
 type ComfyNode struct {
-	Inputs map[string]ComfyNodeInput
+	Inputs    map[string]ComfyNodeInput
 	ClassType string
-	Title  string
+	Title     string
 }
 
 // one-of
@@ -154,20 +145,20 @@ const (
 )
 
 type ComfyNodeInput struct {
-	Type	ComfyNodeInputType
-	Number	json.Number
-	Text	string
-	Bool    bool
+	Type      ComfyNodeInputType
+	Number    json.Number
+	Text      string
+	Bool      bool
 	OutputPtr ComfyNodeOutput
 }
 
 type ComfyNodeOutput struct {
-	NodeRef	string
+	NodeRef   string
 	OutputIdx int64
 }
 
 type InputRef struct {
-	nodeId	string
-	inputId	string
+	nodeId    string
+	inputId   string
 	inputType ComfyNodeInputType
 }

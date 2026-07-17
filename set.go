@@ -56,14 +56,14 @@ func cmdSet(args []string) error {
 		return fmt.Errorf("Unable to find '%s'. Check the dump command first.", args[0])
 	}
 	var valueStr string = args[1]
-	if args[0] == "width" || args[0] == "height" || args[0] == "fps" || 
+	if args[0] == "width" || args[0] == "height" || args[0] == "fps" ||
 		args[0] == "batch" || args[0] == "seed" {
-			valueInt64, err := strconv.ParseInt(args[1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("For %s property expected value to be int. But got: %s",
-	args[0], args[1])
-			}
-			cw.SetInt(inputRef, valueInt64)
+		valueInt64, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			return fmt.Errorf("For %s property expected value to be int. But got: %s",
+				args[0], args[1])
+		}
+		cw.SetInt(inputRef, valueInt64)
 	} else {
 		cw.SetString(inputRef, valueStr)
 	}
