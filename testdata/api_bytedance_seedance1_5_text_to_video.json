@@ -1,0 +1,34 @@
+{
+  "1": {
+    "inputs": {
+      "model": "seedance-1-5-pro-251215",
+      "prompt": "A handsome man stands atop a mist-shrouded mountain ridge. He wears sleek, practical outdoor gear — a dark charcoal windproof jacket, professional climbing pants, and a backpack over both shoulders. The mountain breeze lightly tousles his hair; his expression is calm and resolute. Behind him, surging clouds and mist swirl among jagged rocks, occasionally parting to reveal distant snow-capped peaks. The camera slowly pushes in from behind as he gazes into the abyss of rolling clouds below. In the frigid air, his breath condenses into white mist, adding natural atmospheric detail. He slightly turns toward the camera, his sharp eyes filled with unyielding determination, and says in a steady, powerful voice: “I like challenges.”\n",
+      "resolution": "720p",
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "seed": 697033429,
+      "camera_fixed": false,
+      "watermark": false,
+      "generate_audio": true
+    },
+    "class_type": "ByteDanceTextToVideoNode",
+    "_meta": {
+      "title": "ByteDance Text to Video"
+    }
+  },
+  "2": {
+    "inputs": {
+      "filename_prefix": "video/seedance",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  }
+}

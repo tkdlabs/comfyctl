@@ -1,0 +1,1389 @@
+{
+  "62": {
+    "inputs": {
+      "image": "6-key-frames-1.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Start Frame"
+    }
+  },
+  "122": {
+    "inputs": {
+      "image": "6-key-frames-2.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "End Frame"
+    }
+  },
+  "124": {
+    "inputs": {
+      "image": "6-key-frames-3.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "End Frame"
+    }
+  },
+  "126": {
+    "inputs": {
+      "image": "6-key-frames-4.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "End Frame"
+    }
+  },
+  "128": {
+    "inputs": {
+      "image": "6-key-frames-5.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "End Frame"
+    }
+  },
+  "130": {
+    "inputs": {
+      "image": "6-key-frames-6.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "End Frame"
+    }
+  },
+  "133": {
+    "inputs": {
+      "image1": [
+        "140:8",
+        0
+      ],
+      "image2": [
+        "228:227",
+        0
+      ]
+    },
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "Batch Images (DEPRECATED)"
+    }
+  },
+  "134": {
+    "inputs": {
+      "image1": [
+        "133",
+        0
+      ],
+      "image2": [
+        "245:244",
+        0
+      ]
+    },
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "Batch Images (DEPRECATED)"
+    }
+  },
+  "135": {
+    "inputs": {
+      "image1": [
+        "134",
+        0
+      ],
+      "image2": [
+        "262:261",
+        0
+      ]
+    },
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "Batch Images (DEPRECATED)"
+    }
+  },
+  "136": {
+    "inputs": {
+      "image1": [
+        "135",
+        0
+      ],
+      "image2": [
+        "279:278",
+        0
+      ]
+    },
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "Batch Images (DEPRECATED)"
+    }
+  },
+  "145": {
+    "inputs": {
+      "fps": 24,
+      "bit_depth": 8,
+      "images": [
+        "136",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "146": {
+    "inputs": {
+      "filename_prefix": "video/ComfyUI",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "145",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "140:38": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "140:7": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "140:38",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "140:60": {
+    "inputs": {
+      "fps": 16,
+      "bit_depth": 8,
+      "images": [
+        "140:8",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "140:37": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "140:56": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "140:55": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "140:92",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "140:92": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "140:56",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "140:91": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "140:37",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "140:54": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "140:91",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "140:58": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "140:55",
+        0
+      ],
+      "positive": [
+        "140:67",
+        0
+      ],
+      "negative": [
+        "140:67",
+        1
+      ],
+      "latent_image": [
+        "140:57",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "140:57": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 106238756028535,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "140:54",
+        0
+      ],
+      "positive": [
+        "140:67",
+        0
+      ],
+      "negative": [
+        "140:67",
+        1
+      ],
+      "latent_image": [
+        "140:67",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "140:39": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "140:67": {
+    "inputs": {
+      "width": 720,
+      "height": 720,
+      "length": 25,
+      "batch_size": 1,
+      "positive": [
+        "140:6",
+        0
+      ],
+      "negative": [
+        "140:7",
+        0
+      ],
+      "vae": [
+        "140:39",
+        0
+      ],
+      "start_image": [
+        "62",
+        0
+      ],
+      "end_image": [
+        "122",
+        0
+      ]
+    },
+    "class_type": "WanFirstLastFrameToVideo",
+    "_meta": {
+      "title": "WanFirstLastFrameToVideo"
+    }
+  },
+  "140:6": {
+    "inputs": {
+      "text": "cat turn around",
+      "clip": [
+        "140:38",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "140:8": {
+    "inputs": {
+      "samples": [
+        "140:58",
+        0
+      ],
+      "vae": [
+        "140:39",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "228:212": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "228:213": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "228:212",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "228:214": {
+    "inputs": {
+      "fps": 16,
+      "bit_depth": 8,
+      "images": [
+        "228:227",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "228:215": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "228:216": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "228:217": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "228:218",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "228:218": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "228:216",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "228:219": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "228:215",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "228:220": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "228:219",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "228:221": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "228:217",
+        0
+      ],
+      "positive": [
+        "228:224",
+        0
+      ],
+      "negative": [
+        "228:224",
+        1
+      ],
+      "latent_image": [
+        "228:222",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "228:222": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 106238756028535,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "228:220",
+        0
+      ],
+      "positive": [
+        "228:224",
+        0
+      ],
+      "negative": [
+        "228:224",
+        1
+      ],
+      "latent_image": [
+        "228:224",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "228:223": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "228:224": {
+    "inputs": {
+      "width": 720,
+      "height": 720,
+      "length": 25,
+      "batch_size": 1,
+      "positive": [
+        "228:225",
+        0
+      ],
+      "negative": [
+        "228:213",
+        0
+      ],
+      "vae": [
+        "228:223",
+        0
+      ],
+      "start_image": [
+        "122",
+        0
+      ],
+      "end_image": [
+        "124",
+        0
+      ]
+    },
+    "class_type": "WanFirstLastFrameToVideo",
+    "_meta": {
+      "title": "WanFirstLastFrameToVideo"
+    }
+  },
+  "228:225": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "228:212",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "228:227": {
+    "inputs": {
+      "samples": [
+        "228:221",
+        0
+      ],
+      "vae": [
+        "228:223",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "245:229": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "245:230": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "245:229",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "245:231": {
+    "inputs": {
+      "fps": 16,
+      "bit_depth": 8,
+      "images": [
+        "245:244",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "245:232": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "245:233": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "245:234": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "245:235",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "245:235": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "245:233",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "245:236": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "245:232",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "245:237": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "245:236",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "245:238": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "245:234",
+        0
+      ],
+      "positive": [
+        "245:241",
+        0
+      ],
+      "negative": [
+        "245:241",
+        1
+      ],
+      "latent_image": [
+        "245:239",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "245:239": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 106238756028535,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "245:237",
+        0
+      ],
+      "positive": [
+        "245:241",
+        0
+      ],
+      "negative": [
+        "245:241",
+        1
+      ],
+      "latent_image": [
+        "245:241",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "245:240": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "245:241": {
+    "inputs": {
+      "width": 720,
+      "height": 720,
+      "length": 25,
+      "batch_size": 1,
+      "positive": [
+        "245:242",
+        0
+      ],
+      "negative": [
+        "245:230",
+        0
+      ],
+      "vae": [
+        "245:240",
+        0
+      ],
+      "start_image": [
+        "124",
+        0
+      ],
+      "end_image": [
+        "126",
+        0
+      ]
+    },
+    "class_type": "WanFirstLastFrameToVideo",
+    "_meta": {
+      "title": "WanFirstLastFrameToVideo"
+    }
+  },
+  "245:242": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "245:229",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "245:244": {
+    "inputs": {
+      "samples": [
+        "245:238",
+        0
+      ],
+      "vae": [
+        "245:240",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "262:246": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "262:247": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "262:246",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "262:248": {
+    "inputs": {
+      "fps": 16,
+      "bit_depth": 8,
+      "images": [
+        "262:261",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "262:249": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "262:250": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "262:251": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "262:252",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "262:252": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "262:250",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "262:253": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "262:249",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "262:254": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "262:253",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "262:255": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "262:251",
+        0
+      ],
+      "positive": [
+        "262:258",
+        0
+      ],
+      "negative": [
+        "262:258",
+        1
+      ],
+      "latent_image": [
+        "262:256",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "262:256": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 106238756028535,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "262:254",
+        0
+      ],
+      "positive": [
+        "262:258",
+        0
+      ],
+      "negative": [
+        "262:258",
+        1
+      ],
+      "latent_image": [
+        "262:258",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "262:257": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "262:258": {
+    "inputs": {
+      "width": 720,
+      "height": 720,
+      "length": 25,
+      "batch_size": 1,
+      "positive": [
+        "262:259",
+        0
+      ],
+      "negative": [
+        "262:247",
+        0
+      ],
+      "vae": [
+        "262:257",
+        0
+      ],
+      "start_image": [
+        "126",
+        0
+      ],
+      "end_image": [
+        "128",
+        0
+      ]
+    },
+    "class_type": "WanFirstLastFrameToVideo",
+    "_meta": {
+      "title": "WanFirstLastFrameToVideo"
+    }
+  },
+  "262:259": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "262:246",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "262:261": {
+    "inputs": {
+      "samples": [
+        "262:255",
+        0
+      ],
+      "vae": [
+        "262:257",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "279:263": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "279:264": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "279:263",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "279:265": {
+    "inputs": {
+      "fps": 16,
+      "bit_depth": 8,
+      "images": [
+        "279:278",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "279:266": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "279:267": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "279:268": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "279:269",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "279:269": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "279:267",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "279:270": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1,
+      "model": [
+        "279:266",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "279:271": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "279:270",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "279:272": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "279:268",
+        0
+      ],
+      "positive": [
+        "279:275",
+        0
+      ],
+      "negative": [
+        "279:275",
+        1
+      ],
+      "latent_image": [
+        "279:273",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "279:273": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 106238756028535,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "279:271",
+        0
+      ],
+      "positive": [
+        "279:275",
+        0
+      ],
+      "negative": [
+        "279:275",
+        1
+      ],
+      "latent_image": [
+        "279:275",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "279:274": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "279:275": {
+    "inputs": {
+      "width": 720,
+      "height": 720,
+      "length": 25,
+      "batch_size": 1,
+      "positive": [
+        "279:276",
+        0
+      ],
+      "negative": [
+        "279:264",
+        0
+      ],
+      "vae": [
+        "279:274",
+        0
+      ],
+      "start_image": [
+        "128",
+        0
+      ],
+      "end_image": [
+        "130",
+        0
+      ]
+    },
+    "class_type": "WanFirstLastFrameToVideo",
+    "_meta": {
+      "title": "WanFirstLastFrameToVideo"
+    }
+  },
+  "279:276": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "279:263",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "279:278": {
+    "inputs": {
+      "samples": [
+        "279:272",
+        0
+      ],
+      "vae": [
+        "279:274",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  }
+}

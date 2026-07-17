@@ -1,0 +1,46 @@
+{
+  "24": {
+    "inputs": {
+      "image": "tv_head.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "32": {
+    "inputs": {
+      "filename_prefix": "video/wan2.7_i2v",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "33",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "33": {
+    "inputs": {
+      "model": "wan2.7-i2v",
+      "model.prompt": "Starting from the front view, the camera slowly orbits behind the TV-headed figure, settling over its shoulder and looking out across the dim, blurred office into the darkness beyond. A deep ambient bass tone hums. The figure doesn't move, but the screen's glow casts a faint rectangle of light forward into the dark room. TV Head (quietly): \"Something's out there.\" The screen flickers once. \"It's been watching us back.\"\n",
+      "model.negative_prompt": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走，字幕，文本",
+      "model.resolution": "720P",
+      "model.duration": 10,
+      "seed": 1179774652,
+      "prompt_extend": true,
+      "watermark": false,
+      "first_frame": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "Wan2ImageToVideoApi",
+    "_meta": {
+      "title": "Wan 2.7 Image to Video"
+    }
+  }
+}
