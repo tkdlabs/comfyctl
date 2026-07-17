@@ -68,12 +68,22 @@ func FindFps(workflow ComfyWorkflow) (InputRef, error) {
 func FindSeed(workflow ComfyWorkflow) (InputRef, error) {
 	for k, node := range workflow.Nodes {
 		_, found := node.Inputs["seed"]
-		if !found {
-			continue
-		}
-		ref, found := crawlUntilFoundNumber(workflow, k, []string{"seed", "value"}, []string{})
 		if found {
-			return ref, nil
+			ref, found := crawlUntilFoundNumber(workflow, k, []string{"seed", "value"}, []string{})
+			if found {
+				return ref, nil
+			}
+		}
+		// try with noise_seed.
+		_, found = node.Inputs["noise_seed"]
+		if found {
+			addNoiseVal, found := node.Inputs["add_noise"]
+			if !found || addNoiseVal.Text == "enable" {
+				ref, found := crawlUntilFoundNumber(workflow, k, []string{"noise_seed", "seed", "value"}, []string{})
+				if found {
+					return ref, nil
+				}
+			}
 		}
 	}
 	return InputRef{}, errors.New("Unable to find seed in the workflow")
