@@ -109,12 +109,14 @@ func cmdDump(args []string) error {
 
 	_, requested = display["seed"]
 	if requested {
-		seed, err := FindSeed(cw)
+		seeds, err := FindSeed(cw)
 		if err != nil {
 			fmt.Printf("Failed to find seed: %v\n", err)
 		} else {
-			val, _ := cw.Resolve(seed)
-			fmt.Printf("Found seed: %s\n", val.(json.Number).String())
+			for _, seed := range seeds {
+				val, _ := cw.Resolve(seed)
+				fmt.Printf("Found seed: %s\n", val.(json.Number).String())
+			}
 		}
 	}
 

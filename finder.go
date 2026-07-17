@@ -65,13 +65,14 @@ func FindFps(workflow ComfyWorkflow) (InputRef, error) {
 	return InputRef{}, errors.New("Unable to find fps in the workflow")
 }
 
-func FindSeed(workflow ComfyWorkflow) (InputRef, error) {
+func FindSeed(workflow ComfyWorkflow) ([]InputRef, error) {
+	refsfound := make([]InputRef, 0)
 	for k, node := range workflow.Nodes {
 		_, found := node.Inputs["seed"]
 		if found {
 			ref, found := crawlUntilFoundNumber(workflow, k, []string{"seed", "value"}, []string{})
 			if found {
-				return ref, nil
+				refsfound = append(refsfound, ref)
 			}
 		}
 		// try with noise_seed.
@@ -81,12 +82,17 @@ func FindSeed(workflow ComfyWorkflow) (InputRef, error) {
 			if !found || addNoiseVal.Text == "enable" {
 				ref, found := crawlUntilFoundNumber(workflow, k, []string{"noise_seed", "seed", "value"}, []string{})
 				if found {
-					return ref, nil
+					refsfound = append(refsfound, ref)
 				}
 			}
 		}
 	}
-	return InputRef{}, errors.New("Unable to find seed in the workflow")
+	if len(refsfound) == 0 {
+		return refsfound, errors.New("Unable to find seed in the workflow")
+	} else if len(refsfound) > 1 {
+		log.Printf("Note: Found %d potential seed locations: [%v]", len(refsfound), refsfound)
+	}
+	return refsfound, nil
 }
 
 func FindPositivePrompt(workflow ComfyWorkflow) (InputRef, error) {

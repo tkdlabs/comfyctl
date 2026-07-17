@@ -64,7 +64,7 @@ var finders = []finder{
 	{"height", FindHeight},
 	{"batch", FindBatchSize},
 	{"fps", FindFps},
-	{"seed", FindSeed},
+	//	{"seed", FindSeed},
 	{"image", FindImage},
 }
 
@@ -105,6 +105,21 @@ func TestFindersReport(t *testing.T) {
 			}
 			found = append(found, fmt.Sprintf("%s=%s", f.label, truncate(val)))
 		}
+		// seed
+		refs, err := FindSeed(cw)
+		if err != nil {
+			continue
+		}
+		hits["seed"]++
+		for _, ref := range refs {
+			val, rerr := cw.Resolve(ref)
+			if rerr != nil {
+				found = append(found, "seed=<resolve err>")
+				continue
+			}
+			found = append(found, fmt.Sprintf("seed=%s", truncate(val)))
+		}
+
 		fmt.Fprintf(&b, "\n%-48s\n  %s\n", name, strings.Join(found, "\n  "))
 	}
 
@@ -112,6 +127,7 @@ func TestFindersReport(t *testing.T) {
 	for _, f := range finders {
 		fmt.Fprintf(&b, "  %-10s %2d\n", f.label, hits[f.label])
 	}
+	fmt.Fprintf(&b, "  %-10s %2d\n", "seed", hits["seed"])
 	t.Log(b.String())
 }
 
@@ -153,7 +169,7 @@ func enabledSeedNodes(raw map[string]any) map[string]string {
 // left half-updated. Remove the Skip once FindSeed/set fan out to all matches
 // (see IMPROVEMENTS.md).
 func TestSetSeedUpdatesAllNodes(t *testing.T) {
-	t.Skip("known bug: set updates one node; multi-seed workflows stay half-updated (IMPROVEMENTS.md)")
+	//t.Skip("known bug: set updates one node; multi-seed workflows stay half-updated (IMPROVEMENTS.md)")
 
 	const newSeed = int64(1234567890123456)
 	want := strconv.FormatInt(newSeed, 10)
@@ -169,12 +185,14 @@ func TestSetSeedUpdatesAllNodes(t *testing.T) {
 			if len(before) < 2 {
 				t.Skip("single/no enabled seed node; not a multi-seed case")
 			}
-			ref, err := FindSeed(cw)
+			refs, err := FindSeed(cw)
 			if err != nil {
 				t.Fatalf("FindSeed: %v", err)
 			}
-			if err := cw.SetInt(ref, newSeed); err != nil {
-				t.Fatalf("SetInt: %v", err)
+			for _, ref := range refs {
+				if err := cw.SetInt(ref, newSeed); err != nil {
+					t.Fatalf("SetInt: %v", err)
+				}
 			}
 			var stale []string
 			for id, v := range enabledSeedNodes(cw.Raw) {
