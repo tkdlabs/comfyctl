@@ -8,13 +8,14 @@ nodes the crawl doesn't follow.
 
 ## Prioritized by blast radius
 
-### 1. Seed finder misses `noise_seed` (18 / 26 files)
+### 1. Seed finder misses `noise_seed` (18 / 26 files) — DONE (70cc020)
 `RandomNoise` (flux2, hunyuan, ltx2) and `KSamplerAdvanced` (wan2.2,
 key-frames) name the input `noise_seed`, not `seed`. `FindSeed` only anchors on
 `seed`, so seed detection silently fails on the majority of current workflows —
 only legacy `KSampler` and the bytedance API nodes still hit.
-- **Fix:** add `noise_seed` to both the anchor check and the crawl follow-list.
-- Cheap, highest impact.
+- **Fix:** add `noise_seed` to both the anchor check and the crawl follow-list,
+  guarded by an `add_noise == "enable"` check so disabled samplers are skipped.
+- Coverage now 26/26.
 
 ### 2. Prompt crawl dead-ends at routing / processing nodes
 - **LTX2 t2v/i2v/ia2v — positive lost.** Chain is
@@ -46,16 +47,17 @@ These can't be found at all.
   support likely needs a class_type -> field mapping. Lower priority (API
   workflows are a distinct submode).
 
-### 5. `set` updates only one node; multi-seed workflows go half-updated
-An attribute can map to N nodes, but `Find*` returns a single `InputRef` and
-`set` writes exactly one. `set seed X` on key-frames updates 1 of 5 enabled
-samplers (the other 4 keep the old seed); on LTX2 it updates 1 of 2 `RandomNoise`
-nodes. Worse, which node is picked is nondeterministic (map iteration order), and
-`dump seed` reads stable on key-frames — so the write silently corrupts while the
-read looks fine. Guarded by `TestSetSeedUpdatesAllNodes` (currently skipped).
-- **Fix:** `Find*` returns `[]InputRef`; `set` applies to all matches; `dump`
-  reports the common value and warns when enabled matches diverge. This is the
-  concrete form of the architectural note below.
+### 5. `set` updates only one node; multi-seed workflows go half-updated — DONE (04b132e)
+An attribute can map to N nodes, but `Find*` returned a single `InputRef` and
+`set` wrote exactly one. `set seed X` on key-frames updated 1 of 5 enabled
+samplers (the other 4 kept the old seed); on LTX2 it updated 1 of 2 `RandomNoise`
+nodes. Worse, which node was picked was nondeterministic (map iteration order),
+and `dump seed` read stable on key-frames — so the write silently corrupted while
+the read looked fine. Guarded by `TestSetSeedUpdatesAllNodes` (now enabled).
+- **Fix:** `FindSeed` returns `[]InputRef`; `set` applies to all matches.
+- **Follow-up:** `FindSeed` still appends in map order, so `dump seed` line
+  order flickers run-to-run. Sort `refsfound` by nodeId for stable output
+  (matters once `dump` gets golden tests).
 
 ### 6. Lock in the non-bugs with golden assertions
 - Empty `negative=""` on flux-klein base models is genuine (empty conditioning),
@@ -79,3 +81,45 @@ ranking: prefer known classes (`CLIPTextEncode`, `Primitive*`) and keep the
 
 The whitelist patches (items 1, 4) are fine as a stopgap to get seeds working
 today; the inverted crawl is the version worth building.
+
+## Roles & markers
+
+`ResolveRole` already resolves markers first, then falls back to `findByRole`.
+Building the write path (`mark` command) unlocks user-defined roles, which
+generalize the whole finder problem.
+
+### Custom (user-defined) roles
+A custom role is a role with **no finder** — the user assigns it by hand via
+`mark`, so `markedRefs` returns the nodes and the `findByRole` fallback never
+runs. The motivating case: workflows with several image / audio refs (3
+`LoadImage` nodes) that the built-in `image` finder can't distinguish. Custom
+roles let the user name them (`character_image`, `bg_audio`, `voice_ref`). This
+is the same multiplicity problem as seed, solved by the same mechanism.
+
+Marker-first + shared namespace also means `mark seed <node>` can override a
+built-in heuristic when it guesses wrong — one mechanism covers "define new
+role" and "pin/override an existing one."
+
+Changes needed (once the `mark` write path exists):
+1. **Accept any role string** in `set`/`dump`/`mark`; keep `findByRole` as the
+   built-in fallback, and treat "unknown role + no markers" as a friendly error
+   rather than rejecting the name up front.
+2. **Infer `set`'s type from the target input, not a role->type table.** The
+   marker points at an input that already has a `ComfyNodeInputType`; branch on
+   that. Kills the `isIntRole` string-matching for built-ins too, and is where
+   the dormant `crawlUntilFoundBool` / a `SetBool` finally earn their keep (a
+   custom role pointing at a bool toggle).
+3. **Add a `roles` command** (`comfyctl roles < wf.json`) listing every marked
+   role + node count. Discoverability guard against the one footgun: a typo in
+   `mark` silently creates a phantom role. Optionally warn in `mark` when a role
+   name is new to the file.
+
+### Design stance
+Keep roles **schema-less and per-file**: the workflow's `_meta.comfyctl` markers
+*are* the registry. No global config declaring roles/types — the file is
+self-describing, which fits a tool whose job is "read a workflow, act on it."
+The `roles` command reads them back; no external state to keep in sync.
+
+### Still gated on
+The `_meta.comfyctl` round-trip through ComfyUI's `/prompt` endpoint is
+unverified. Confirm a marked workflow still submits before relying on markers.
