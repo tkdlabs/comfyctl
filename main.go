@@ -1,43 +1,54 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 )
 
+const usage = `comfyctl - tool for viewing/modifying/submitting ComfyUI workflows
+
+Usage:
+  comfyctl <command> [flags]
+
+Commands:
+  dump		dumps details about the workflow (prompts, image sources, resolution, seed)
+  set		changes details about the workflow
+  submit	submits the workflow to ComfyUI`
+
 func main () {
-	flag.Parse()
-	args := flag.Args()
-	if len(args) != 1 {
-		fmt.Printf("Use: json [workflow.json]. Got %v\n", args)
+	if len(os.Args) < 2 {
+		fmt.Fprintf(os.Stderr, usage)
+		os.Exit(2)
+	}
+
+	cmd := os.Args[1]
+	cmdArgs := os.Args[2:]
+	var err error
+
+	switch cmd {
+	case "dump":
+		err = cmdDump(cmdArgs)
+	case "set":
+		err = cmdSet(cmdArgs)
+	case "submit":
+		err = cmdSubmit(cmdArgs)
+	case "-h", "--help", "help":
+		fmt.Println(usage)
+		return
+	default:
+		fmt.Printf("unkown command %q\n\n%s\n", cmd, usage)
+	}
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-	cw, err := OpenComfyWorkflow(args[0])
-	if err != nil {
-		fmt.Printf("Error opening %s: %v\n", args[0], err)
-		os.Exit(1)
-	}
-
-	// Find batch size
-	
-	// Find prompts
-	
-/*	posPrompt, err := FindPositivePrompt(cw)
-	if err != nil {
-		fmt.Printf("Failed to find positive prompt: %v\n", err)
-	} else {
-		fmt.Printf("Found positive prompt %s\n", posPrompt)//: %s\n", posPrompt)
-	}*/
-	negPrompt, err := FindNegativePrompt(cw)
-	if err != nil {
-		fmt.Printf("Failed to find negative prompt: %v\n", err)
-	} else {
-		fmt.Printf("Found negative prompt %s\n", negPrompt)//: %s\n", posPrompt)
-	}
-
-	// Find resolution
-
-	// Find FPS
 }
 
+func cmdSet(args []string) error {
+	return nil
+}
+
+func cmdSubmit(args []string) error {
+	return nil
+}

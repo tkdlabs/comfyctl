@@ -2,15 +2,121 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"slices"
 	"strings"
 )
 
-func FindPositivePrompt(workflow ComfyWorkflow) (string, error) {
+type InputRef struct {
+	nodeId	string
+	inputId	string
+	inputType ComfyNodeInputType
+}
+
+func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
+	node, found := c.Nodes[inputRef.nodeId]
+	if !found {
+		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
+	}
+	input, found := node.Inputs[inputRef.inputId]
+	if !found {
+		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
+	}
+	if input.Type != inputRef.inputType {
+		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s->%s input type mismatch: %v (expected) vs %v.", 
+							inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type))
+	}
+	switch input.Type {
+	case ComfyNumberInput:
+		return input.Number, nil
+	case ComfyTextInput:
+		return input.Text, nil
+	case ComfyBoolInput:
+		return input.Bool, nil
+	case ComfyNodeRef:
+		return fmt.Sprintf("[Node: %s, Output %d]", input.OutputPtr.NodeRef, input.OutputPtr.OutputIdx), nil
+	}
+	return nil, errors.New("Unknown node type!")
+}
+
+func FindHeight(workflow ComfyWorkflow) (InputRef, error) {
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["height"]
+	   if !found {
+		   continue
+	   }
+	   ref, found := crawlUntilFoundNumber(workflow, k, []string{"height", "value"}, []string{})
+	   if found {
+		   return ref, nil
+	   }
+   }
+   return InputRef {}, errors.New("Unable to find height in the workflow")
+
+}
+
+func FindWidth(workflow ComfyWorkflow) (InputRef, error) {
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["width"]
+	   if !found {
+		   continue
+	   }
+	   ref, found := crawlUntilFoundNumber(workflow, k, []string{"width", "value"}, []string{})
+	   if found {
+		   return ref, nil
+	   }
+   }
+   return InputRef {}, errors.New("Unable to find width in the workflow")
+
+}
+
+func FindBatchSize(workflow ComfyWorkflow) (InputRef, error) {
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["batch_size"]
+	   if !found {
+		   continue
+	   }
+	   ref, found := crawlUntilFoundNumber(workflow, k, []string{"batch_size", "value"}, []string{})
+	   if found {
+		   return ref, nil
+	   }
+   }
+   return InputRef {}, errors.New("Unable to find batch_size in the workflow")
+}
+
+func FindFps(workflow ComfyWorkflow) (InputRef, error) {
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["fps"]
+	   if !found {
+		   continue
+	   }
+	   ref, found := crawlUntilFoundNumber(workflow, k, []string{"fps", "value"}, []string{})
+	   if found {
+		   return ref, nil
+	   }
+   }
+   return InputRef {}, errors.New("Unable to find fps in the workflow")
+}
+
+func FindSeed(workflow ComfyWorkflow) (InputRef, error) {
+   for k, node := range workflow.Nodes {
+	   _, found := node.Inputs["seed"]
+	   if !found {
+		   continue
+	   }
+	   ref, found := crawlUntilFoundNumber(workflow, k, []string{"seed", "value"}, []string{})
+	   if found {
+		   return ref, nil
+	   }
+   }
+   return InputRef {}, errors.New("Unable to find seed in the workflow")
+}
+
+
+func FindPositivePrompt(workflow ComfyWorkflow) (InputRef, error) {
 
    // Fuzzy search for node that has "Positive Prompt" in title
-   for _, node := range workflow.Nodes {
+   for k, node := range workflow.Nodes {
 	if strings.Contains(node.Title, "Positive Prompt") {
 		nodeInput, found := node.Inputs["text"]
 		if !found {
@@ -20,7 +126,7 @@ func FindPositivePrompt(workflow ComfyWorkflow) (string, error) {
 			log.Printf("Weird, node with input 'text' is not string, but %v", nodeInput.Type)
 			continue
 		}
-		return nodeInput.Text, nil
+		return InputRef { nodeId: k, inputId: "text", inputType: ComfyTextInput } , nil
 	}
    }
 
@@ -30,19 +136,19 @@ func FindPositivePrompt(workflow ComfyWorkflow) (string, error) {
 	   if !found {
 		   continue
 	   }
-	   prompt, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "positive", "prompt", "conditioning"},
+	   ref, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "positive", "prompt", "conditioning"},
    			[]string{"ConditioningZeroOut"})
 	   if found {
-		   return prompt, nil
+		   return ref, nil
 	   }
    }
-   return "", errors.New("Unable to find positive prompt in the workflow")
+   return InputRef {}, errors.New("Unable to find positive prompt in the workflow")
 }
 
-func FindNegativePrompt(workflow ComfyWorkflow) (string, error) {
+func FindNegativePrompt(workflow ComfyWorkflow) (InputRef, error) {
 
    // Fuzzy search for node that has "Positive Prompt" in title
-   for _, node := range workflow.Nodes {
+   for k, node := range workflow.Nodes {
 	if strings.Contains(node.Title, "Negative Prompt") {
 		nodeInput, found := node.Inputs["text"]
 		if !found {
@@ -52,7 +158,7 @@ func FindNegativePrompt(workflow ComfyWorkflow) (string, error) {
 			log.Printf("Weird, node with input 'text' is not string, but %v", nodeInput.Type)
 			continue
 		}
-		return nodeInput.Text, nil
+		return InputRef { nodeId: k, inputId: "text", inputType: ComfyTextInput }, nil
 	}
    }
 
@@ -62,38 +168,76 @@ func FindNegativePrompt(workflow ComfyWorkflow) (string, error) {
 	   if !found {
 		   continue
 	   }
-	   prompt, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "negative", "prompt", "conditioning"},
+	   ref, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "negative", "prompt", "conditioning"},
 					   []string {"ConditioningZeroOut"})
 	   if found {
-		   return prompt, nil
+		   return ref, nil
 	   }
    }
-   return "", errors.New("Unable to find negative prompt in the workflow")
+   return InputRef {}, errors.New("Unable to find negative prompt in the workflow")
 }
-func crawlUntilFoundText(workflow ComfyWorkflow, startNode string, followInputs []string, bannedClasses []string) (string, bool) {
+
+func FindImage(workflow ComfyWorkflow) (InputRef, error) {
+   for k, node := range workflow.Nodes {
+	   if node.ClassType == "LoadImage" {
+		   nodeInput, found := node.Inputs["image"]
+		   if !found || nodeInput.Type != ComfyTextInput {
+			   continue
+		   }
+		   return InputRef { nodeId: k, inputId: "image", inputType: ComfyTextInput }, nil
+	   }
+   }
+   return InputRef {}, errors.New("Unable to find source image in the workflow")
+}
+
+func crawlUntilFoundText(workflow ComfyWorkflow, startNode string, followInputs []string, bannedClasses []string) (InputRef, bool) {
+	ref, found := crawlUntilFound(workflow, startNode, ComfyTextInput, followInputs, bannedClasses)
+	if !found {
+		return InputRef {}, found
+	}
+	return ref, found
+}
+
+func crawlUntilFoundNumber(workflow ComfyWorkflow, startNode string, followInputs []string, bannedClasses []string) (InputRef, bool) {
+	ref, found := crawlUntilFound(workflow, startNode, ComfyNumberInput, followInputs, bannedClasses)
+	if !found {
+		return InputRef {}, found
+	}
+	return ref, found
+}
+
+func crawlUntilFoundBool(workflow ComfyWorkflow, startNode string, followInputs []string, bannedClasses []string) (InputRef, bool) {
+	ref, found := crawlUntilFound(workflow, startNode, ComfyBoolInput, followInputs, bannedClasses)
+	if !found {
+		return InputRef {}, found
+	}
+	return ref, found
+}
+func crawlUntilFound(workflow ComfyWorkflow, startNode string, targetType ComfyNodeInputType, followInputs []string, bannedClasses []string) (InputRef, bool) {
+	invalidRes := InputRef {}
 	currentNode, found := workflow.Nodes[startNode]
 	if !found {
-		return "", false
+		return invalidRes, false
 	}
 	if slices.ContainsFunc(bannedClasses, func (class string) bool { return class == currentNode.ClassType  }) {
 		// dont follow nodes of 'banned classes'
-		return "", false
+		return invalidRes, false
 	}
 	for _, inputKey := range followInputs {
 		inputEntry, found := currentNode.Inputs[inputKey]
 		if found {
-			if inputEntry.Type == ComfyTextInput {
-				// finish crawl, found text
-				return inputEntry.Text, true
+			if inputEntry.Type == targetType {
+				// finish crawl, found the right type
+				return InputRef { nodeId: startNode, inputId: inputKey, inputType: targetType }, true
 			}
 			if inputEntry.Type == ComfyNodeRef {
-				recursiveRes, found := crawlUntilFoundText(workflow, inputEntry.OutputPtr.NodeRef, followInputs,
+				ref, found := crawlUntilFound(workflow, inputEntry.OutputPtr.NodeRef, targetType, followInputs,
 										bannedClasses)
 				if found {
-					return recursiveRes, true
+					return ref, true
 				}
 			}
 		}
 	}
-	return "", false
+	return invalidRes, false
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"os"
+	"io"
 )
 
 type ComfyFormat int
@@ -19,15 +19,11 @@ type ComfyWorkflow struct {
 	Nodes map[string]ComfyNode
 }
 
-func OpenComfyWorkflow(path string) (ComfyWorkflow, error) {
+func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 	var result ComfyWorkflow
-	file, err := os.Open(path)
-	if err != nil {
-		return result, err
-	}
-	defer file.Close()
+	var err error
 
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(reader)
 	if err := decoder.Decode(&result.Raw); err != nil {
 		return result, err
 	}
@@ -38,7 +34,7 @@ func OpenComfyWorkflow(path string) (ComfyWorkflow, error) {
 	case Unknown:
 		return result, errors.New("Unknown format. Either new ComfyUI format that is not supported or corrupted file.")
 	}
-        result.Nodes, err = ParseNodesMap(result.Raw)
+	result.Nodes, err = ParseNodesMap(result.Raw)
 	if err != nil {
 		return result, err
 	}
