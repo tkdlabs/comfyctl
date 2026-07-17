@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 )
 
 type ComfyFormat int
@@ -25,6 +26,8 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 	var err error
 
 	decoder := json.NewDecoder(reader)
+	// Avoid losing precision especially for > 2^53 seeds.
+	decoder.UseNumber()
 	if err := decoder.Decode(&result.Raw); err != nil {
 		return result, err
 	}
@@ -114,7 +117,7 @@ func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
 		return errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
 	}
 	input.Type = ComfyNumberInput
-	input.Number = float64(value)
+	input.Number = json.Number(strconv.FormatInt(value, 10))
 	nodeRaw, found := cw.Raw[inputRef.nodeId]
 	if !found {
 		return errors.New(fmt.Sprintf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId))
@@ -136,7 +139,7 @@ func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
 		return errors.New(fmt.Sprintf("Internal error. Node %s has no %s input in raw format.", 
 			inputRef.nodeId, inputRef.inputId))
 	}
-	inputMapRawMap[inputRef.inputId] = float64(value)
+	inputMapRawMap[inputRef.inputId] = json.Number(strconv.FormatInt(value, 10))
 	return nil
 }
 
@@ -165,7 +168,7 @@ const (
 
 type ComfyNodeInput struct {
 	Type	ComfyNodeInputType
-	Number	float64
+	Number	json.Number
 	Text	string
 	Bool    bool
 	OutputPtr ComfyNodeOutput
@@ -173,7 +176,7 @@ type ComfyNodeInput struct {
 
 type ComfyNodeOutput struct {
 	NodeRef	string
-	OutputIdx int
+	OutputIdx int64
 }
 
 type InputRef struct {

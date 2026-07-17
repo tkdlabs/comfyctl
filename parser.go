@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -81,8 +82,8 @@ func parseComfyInputs(inputMap map[string]any) (map[string]ComfyNodeInput, error
 	for k, v := range inputMap {
 		// try extract different types
 		switch v.(type) {
-		case float64:
-			result[k] = ComfyNodeInput { Type: ComfyNumberInput, Number: v.(float64) }
+		case json.Number:
+			result[k] = ComfyNodeInput { Type: ComfyNumberInput, Number: v.(json.Number) }
 		case string:
 			result[k] = ComfyNodeInput { Type: ComfyTextInput, Text: v.(string) }
 		case bool:
@@ -102,9 +103,9 @@ func parseComfyInputs(inputMap map[string]any) (map[string]ComfyNodeInput, error
 	return result, nil
 }
 
-func parseNodeRef(nodeRef []any) (string, int, error) {
+func parseNodeRef(nodeRef []any) (string, int64, error) {
 	var nodeRefTxt = ""
-	var outputIdx = 0
+	var outputIdx int64 = 0
 	if (len(nodeRef) != 2) {
 		return nodeRefTxt, outputIdx, errors.New(
 			fmt.Sprintf("Unexpected nodeRef length, expected:2 got %d: %v", 
@@ -115,15 +116,15 @@ func parseNodeRef(nodeRef []any) (string, int, error) {
 		nodeRefTxt = nodeRef[0].(string)
 	default:
 		return nodeRefTxt, outputIdx, errors.New(
-			fmt.Sprintf("Unexepcted nodeRef format nodeRef[0] expected string got %T: %v",
+			fmt.Sprintf("Unexpected nodeRef format nodeRef[0] expected string got %T: %v",
 					nodeRef[0], nodeRef[0]))
 	}
 	switch nodeRef[1].(type) {
-	case float64:
-		outputIdx = int(nodeRef[1].(float64))
+	case json.Number:
+		outputIdx, _ = nodeRef[1].(json.Number).Int64()
 	default:
 		return nodeRefTxt, outputIdx, errors.New(
-			fmt.Sprintf("Unexepcted nodeRef format nodeRef[1] expected number got %T: %v",
+			fmt.Sprintf("Unexpected nodeRef format nodeRef[1] expected number got %T: %v",
 					nodeRef[1], nodeRef[1]))
 	}
 	return nodeRefTxt, outputIdx, nil

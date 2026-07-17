@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -46,7 +47,7 @@ func cmdDump(args []string) error {
 	reader := bufio.NewReader(os.Stdin)
 	cw, err := OpenComfyWorkflow(reader)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error opening %s: %v\n", args[0], err))
+		return errors.New(fmt.Sprintf("Error parsing workflow: %v\n", err))
 	}
 	var requested bool
 
@@ -79,7 +80,8 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find height: %v\n", err)
 		} else {
 			val, _  := cw.Resolve(height)
-			fmt.Printf("Found height: %d\n", int(val.(float64)))
+			intval, _ := val.(json.Number).Int64()
+			fmt.Printf("Found height: %d\n", intval)
 		}
 	}
 
@@ -90,7 +92,8 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find width: %v\n", err)
 		} else {
 			val, _  := cw.Resolve(width)
-			fmt.Printf("Found width: %d\n", int(val.(float64)))
+			intval, _ := val.(json.Number).Int64()
+			fmt.Printf("Found width: %d\n", intval)
 		}
 	}
 
@@ -101,7 +104,8 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find batch size: %v\n", err)
 		} else {
 			val, _  := cw.Resolve(batch_size)
-			fmt.Printf("Found batch size: %d\n", int(val.(float64)))
+			intval, _ := val.(json.Number).Int64()
+			fmt.Printf("Found batch size: %d\n", intval)
 		}
 	}
 
@@ -112,7 +116,8 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find seed: %v\n", err)
 		} else {
 			val, _  := cw.Resolve(seed)
-			fmt.Printf("Found seed: %d\n", int(val.(float64)))
+			intval, _ := val.(json.Number).Int64()
+			fmt.Printf("Found seed: %d\n", intval)
 		}
 	}
 
@@ -123,7 +128,8 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find fps: %v\n", err)
 		} else {
 			val, _  := cw.Resolve(fps)
-			fmt.Printf("Found fps: %d\n", int(val.(float64)))
+			intval, _ := val.(json.Number).Int64()
+			fmt.Printf("Found fps: %d\n", intval)
 		}
 	}
 
