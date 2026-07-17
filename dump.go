@@ -116,8 +116,7 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find seed: %v\n", err)
 		} else {
 			val, _  := cw.Resolve(seed)
-			intval, _ := val.(json.Number).Int64()
-			fmt.Printf("Found seed: %d\n", intval)
+			fmt.Printf("Found seed: %s\n", val.(json.Number).String())
 		}
 	}
 
