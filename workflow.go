@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -41,6 +42,109 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 	return result, nil
 }
 
+func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
+	node, found := c.Nodes[inputRef.nodeId]
+	if !found {
+		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
+	}
+	input, found := node.Inputs[inputRef.inputId]
+	if !found {
+		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
+	}
+	if input.Type != inputRef.inputType {
+		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s->%s input type mismatch: %v (expected) vs %v.", 
+							inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type))
+	}
+	switch input.Type {
+	case ComfyNumberInput:
+		return input.Number, nil
+	case ComfyTextInput:
+		return input.Text, nil
+	case ComfyBoolInput:
+		return input.Bool, nil
+	case ComfyNodeRef:
+		return fmt.Sprintf("[Node: %s, Output %d]", input.OutputPtr.NodeRef, input.OutputPtr.OutputIdx), nil
+	}
+	return nil, errors.New("Unknown node type!")
+}
+
+func (cw *ComfyWorkflow) SetString(inputRef InputRef, value string) error {
+	node, found := cw.Nodes[inputRef.nodeId]
+	if !found {
+		return errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
+	}
+	input, found := node.Inputs[inputRef.inputId]
+	if !found {
+		return errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
+	}
+	input.Type = ComfyTextInput
+	input.Text = value
+	nodeRaw, found := cw.Raw[inputRef.nodeId]
+	if !found {
+		return errors.New(fmt.Sprintf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId))
+	}
+	nodeRawMap, ok := nodeRaw.(map[string]any)
+	if !ok {
+		return errors.New(fmt.Sprintf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId))
+	}
+	inputMapRaw, found := nodeRawMap["inputs"]
+	if !found {
+		return errors.New(fmt.Sprintf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId))
+	}
+	inputMapRawMap, ok := inputMapRaw.(map[string]any)
+	if !ok {
+		return errors.New(fmt.Sprintf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId))
+	}
+	_, found = inputMapRawMap[inputRef.inputId]
+	if !found {
+		return errors.New(fmt.Sprintf("Internal error. Node %s has no %s input in raw format.", 
+			inputRef.nodeId, inputRef.inputId))
+	}
+	inputMapRawMap[inputRef.inputId] = value
+	return nil
+}
+
+func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
+	node, found := cw.Nodes[inputRef.nodeId]
+	if !found {
+		return errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
+	}
+	input, found := node.Inputs[inputRef.inputId]
+	if !found {
+		return errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
+	}
+	input.Type = ComfyNumberInput
+	input.Number = float64(value)
+	nodeRaw, found := cw.Raw[inputRef.nodeId]
+	if !found {
+		return errors.New(fmt.Sprintf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId))
+	}
+	nodeRawMap, ok := nodeRaw.(map[string]any)
+	if !ok {
+		return errors.New(fmt.Sprintf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId))
+	}
+	inputMapRaw, found := nodeRawMap["inputs"]
+	if !found {
+		return errors.New(fmt.Sprintf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId))
+	}
+	inputMapRawMap, ok := inputMapRaw.(map[string]any)
+	if !ok {
+		return errors.New(fmt.Sprintf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId))
+	}
+	_, found = inputMapRawMap[inputRef.inputId]
+	if !found {
+		return errors.New(fmt.Sprintf("Internal error. Node %s has no %s input in raw format.", 
+			inputRef.nodeId, inputRef.inputId))
+	}
+	inputMapRawMap[inputRef.inputId] = float64(value)
+	return nil
+}
+
+func (cw ComfyWorkflow) WriteOut(writer io.Writer) error {
+	encoder := json.NewEncoder(writer)
+	return encoder.Encode(cw.Raw)
+}
+
 // Node 
 type ComfyNode struct {
 	Inputs map[string]ComfyNodeInput
@@ -59,7 +163,6 @@ const (
 	ComfyNodeRef
 )
 
-
 type ComfyNodeInput struct {
 	Type	ComfyNodeInputType
 	Number	float64
@@ -73,3 +176,8 @@ type ComfyNodeOutput struct {
 	OutputIdx int
 }
 
+type InputRef struct {
+	nodeId	string
+	inputId	string
+	inputType ComfyNodeInputType
+}

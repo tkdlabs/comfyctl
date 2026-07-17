@@ -2,43 +2,10 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"slices"
 	"strings"
 )
-
-type InputRef struct {
-	nodeId	string
-	inputId	string
-	inputType ComfyNodeInputType
-}
-
-func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
-	node, found := c.Nodes[inputRef.nodeId]
-	if !found {
-		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
-	}
-	input, found := node.Inputs[inputRef.inputId]
-	if !found {
-		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
-	}
-	if input.Type != inputRef.inputType {
-		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s->%s input type mismatch: %v (expected) vs %v.", 
-							inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type))
-	}
-	switch input.Type {
-	case ComfyNumberInput:
-		return input.Number, nil
-	case ComfyTextInput:
-		return input.Text, nil
-	case ComfyBoolInput:
-		return input.Bool, nil
-	case ComfyNodeRef:
-		return fmt.Sprintf("[Node: %s, Output %d]", input.OutputPtr.NodeRef, input.OutputPtr.OutputIdx), nil
-	}
-	return nil, errors.New("Unknown node type!")
-}
 
 func FindHeight(workflow ComfyWorkflow) (InputRef, error) {
    for k, node := range workflow.Nodes {

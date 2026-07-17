@@ -45,10 +45,6 @@ func main () {
 	}
 }
 
-func cmdSet(args []string) error {
-	return nil
-}
-
 func cmdSubmit(args []string) error {
 	return nil
 }
