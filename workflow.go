@@ -19,6 +19,7 @@ const (
 type ComfyWorkflow struct {
 	Raw   map[string]any
 	Nodes map[string]ComfyNode
+	NodesSynced bool
 }
 
 func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
@@ -39,6 +40,7 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 		return result, errors.New("Unknown format. Either new ComfyUI format that is not supported or corrupted file.")
 	}
 	result.Nodes, err = ParseNodesMap(result.Raw)
+	result.NodesSynced = true
 	if err != nil {
 		return result, err
 	}
@@ -46,17 +48,20 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 }
 
 func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
+	if !c.NodesSynced {
+		return nil, fmt.Errorf("The parsed nodes are not synced to current version.")
+	}
 	node, found := c.Nodes[inputRef.nodeId]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
+		return nil, fmt.Errorf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId)
 	}
 	input, found := node.Inputs[inputRef.inputId]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
+		return nil, fmt.Errorf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId)
 	}
 	if input.Type != inputRef.inputType {
-		return nil, errors.New(fmt.Sprintf("Invalid InputRef, %s->%s input type mismatch: %v (expected) vs %v.", 
-							inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type))
+		return nil, fmt.Errorf("Invalid InputRef, %s->%s input type mismatch: %v (expected) vs %v.",
+	inputRef.nodeId, inputRef.inputId, inputRef.inputType, input.Type)
 	}
 	switch input.Type {
 	case ComfyNumberInput:
@@ -72,74 +77,56 @@ func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
 }
 
 func (cw *ComfyWorkflow) SetString(inputRef InputRef, value string) error {
-	node, found := cw.Nodes[inputRef.nodeId]
-	if !found {
-		return errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
-	}
-	input, found := node.Inputs[inputRef.inputId]
-	if !found {
-		return errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
-	}
-	input.Type = ComfyTextInput
-	input.Text = value
 	nodeRaw, found := cw.Raw[inputRef.nodeId]
 	if !found {
-		return errors.New(fmt.Sprintf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId)
 	}
 	nodeRawMap, ok := nodeRaw.(map[string]any)
 	if !ok {
-		return errors.New(fmt.Sprintf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId)
 	}
 	inputMapRaw, found := nodeRawMap["inputs"]
 	if !found {
-		return errors.New(fmt.Sprintf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId)
 	}
 	inputMapRawMap, ok := inputMapRaw.(map[string]any)
 	if !ok {
-		return errors.New(fmt.Sprintf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId)
 	}
 	_, found = inputMapRawMap[inputRef.inputId]
 	if !found {
-		return errors.New(fmt.Sprintf("Internal error. Node %s has no %s input in raw format.", 
-			inputRef.nodeId, inputRef.inputId))
+		return fmt.Errorf("Internal error. Node %s has no %s input in raw format.",
+	inputRef.nodeId, inputRef.inputId)
 	}
 	inputMapRawMap[inputRef.inputId] = value
+	cw.NodesSynced = false
 	return nil
 }
 
 func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
-	node, found := cw.Nodes[inputRef.nodeId]
-	if !found {
-		return errors.New(fmt.Sprintf("Invalid InputRef, %s node not found in workflow.", inputRef.nodeId))
-	}
-	input, found := node.Inputs[inputRef.inputId]
-	if !found {
-		return errors.New(fmt.Sprintf("Invalid InputRef, %s node does not have %s input.", inputRef.nodeId, inputRef.inputId))
-	}
-	input.Type = ComfyNumberInput
-	input.Number = json.Number(strconv.FormatInt(value, 10))
 	nodeRaw, found := cw.Raw[inputRef.nodeId]
 	if !found {
-		return errors.New(fmt.Sprintf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId)
 	}
 	nodeRawMap, ok := nodeRaw.(map[string]any)
 	if !ok {
-		return errors.New(fmt.Sprintf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId)
 	}
 	inputMapRaw, found := nodeRawMap["inputs"]
 	if !found {
-		return errors.New(fmt.Sprintf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s has no 'inputs' in raw format.", inputRef.nodeId)
 	}
 	inputMapRawMap, ok := inputMapRaw.(map[string]any)
 	if !ok {
-		return errors.New(fmt.Sprintf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId))
+		return fmt.Errorf("Internal error. Node %s['inputs'] is not structured as map in raw format.", inputRef.nodeId)
 	}
 	_, found = inputMapRawMap[inputRef.inputId]
 	if !found {
-		return errors.New(fmt.Sprintf("Internal error. Node %s has no %s input in raw format.", 
-			inputRef.nodeId, inputRef.inputId))
+		return fmt.Errorf("Internal error. Node %s has no %s input in raw format.",
+	inputRef.nodeId, inputRef.inputId)
 	}
 	inputMapRawMap[inputRef.inputId] = json.Number(strconv.FormatInt(value, 10))
+	cw.NodesSynced = false
 	return nil
 }
 

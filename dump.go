@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 )
@@ -40,14 +39,13 @@ func cmdDump(args []string) error {
 		case "positive","negative","width","height","batch","fps","image", "seed":
 			display[arg] = struct{} {}
 		default: 
-			return errors.New(
-				fmt.Sprintf("Unknown artifact requested: %s\n\n%s", arg, dumpUsage))
+			return fmt.Errorf("Unknown artifact requested: %s\n\n%s", arg, dumpUsage)
 		}
 	}
 	reader := bufio.NewReader(os.Stdin)
 	cw, err := OpenComfyWorkflow(reader)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error parsing workflow: %v\n", err))
+		return fmt.Errorf("Error parsing workflow: %v\n", err)
 	}
 	var requested bool
 
