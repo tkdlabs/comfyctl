@@ -46,7 +46,18 @@ These can't be found at all.
   support likely needs a class_type -> field mapping. Lower priority (API
   workflows are a distinct submode).
 
-### 5. Lock in the non-bugs with golden assertions
+### 5. `set` updates only one node; multi-seed workflows go half-updated
+An attribute can map to N nodes, but `Find*` returns a single `InputRef` and
+`set` writes exactly one. `set seed X` on key-frames updates 1 of 5 enabled
+samplers (the other 4 keep the old seed); on LTX2 it updates 1 of 2 `RandomNoise`
+nodes. Worse, which node is picked is nondeterministic (map iteration order), and
+`dump seed` reads stable on key-frames — so the write silently corrupts while the
+read looks fine. Guarded by `TestSetSeedUpdatesAllNodes` (currently skipped).
+- **Fix:** `Find*` returns `[]InputRef`; `set` applies to all matches; `dump`
+  reports the common value and warns when enabled matches diverge. This is the
+  concrete form of the architectural note below.
+
+### 6. Lock in the non-bugs with golden assertions
 - Empty `negative=""` on flux-klein base models is genuine (empty conditioning),
   not a miss.
 - Colon-namespaced node IDs (`98:22`) parse fine.

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -111,6 +113,82 @@ func TestFindersReport(t *testing.T) {
 		fmt.Fprintf(&b, "  %-10s %2d\n", f.label, hits[f.label])
 	}
 	t.Log(b.String())
+}
+
+// enabledSeedNodes reads the raw map directly (independent of the finder
+// heuristics) and returns nodeID -> seed value for every node whose seed is
+// active: a scalar noise_seed/seed input, with add_noise absent or "enable".
+// This is the ground-truth oracle for "which seeds a set must update".
+func enabledSeedNodes(raw map[string]any) map[string]string {
+	res := make(map[string]string)
+	for id, nv := range raw {
+		nodeMap, ok := nv.(map[string]any)
+		if !ok {
+			continue
+		}
+		inputs, ok := nodeMap["inputs"].(map[string]any)
+		if !ok {
+			continue
+		}
+		key := "noise_seed"
+		if _, ok := inputs[key]; !ok {
+			key = "seed"
+			if _, ok := inputs[key]; !ok {
+				continue
+			}
+		}
+		if an, ok := inputs["add_noise"].(string); ok && an != "enable" {
+			continue // disabled sampler; its seed is inert
+		}
+		if num, ok := inputs[key].(json.Number); ok {
+			res[id] = num.String() // scalar only; skip node-ref inputs
+		}
+	}
+	return res
+}
+
+// TestSetSeedUpdatesAllNodes guards the multi-seed fix: after `set seed X`,
+// every enabled seed node must hold X. Today `set` updates only the single
+// node the finder returns, so multi-sampler workflows (key-frames, LTX2) are
+// left half-updated. Remove the Skip once FindSeed/set fan out to all matches
+// (see IMPROVEMENTS.md).
+func TestSetSeedUpdatesAllNodes(t *testing.T) {
+	t.Skip("known bug: set updates one node; multi-seed workflows stay half-updated (IMPROVEMENTS.md)")
+
+	const newSeed = int64(1234567890123456)
+	want := strconv.FormatInt(newSeed, 10)
+
+	for _, path := range testdataFiles(t) {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			cw, err := openFile(t, path)
+			if err != nil {
+				t.Skipf("parse failed: %v", err)
+			}
+			before := enabledSeedNodes(cw.Raw)
+			if len(before) < 2 {
+				t.Skip("single/no enabled seed node; not a multi-seed case")
+			}
+			ref, err := FindSeed(cw)
+			if err != nil {
+				t.Fatalf("FindSeed: %v", err)
+			}
+			if err := cw.SetInt(ref, newSeed); err != nil {
+				t.Fatalf("SetInt: %v", err)
+			}
+			var stale []string
+			for id, v := range enabledSeedNodes(cw.Raw) {
+				if v != want {
+					stale = append(stale, fmt.Sprintf("%s=%s", id, v))
+				}
+			}
+			sort.Strings(stale)
+			if len(stale) > 0 {
+				t.Errorf("set seed left %d/%d enabled seed nodes stale: %v",
+					len(stale), len(before), stale)
+			}
+		})
+	}
 }
 
 func truncate(v any) string {
