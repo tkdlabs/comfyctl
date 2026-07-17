@@ -69,6 +69,15 @@ func parseComfyNode(node_map map[string]any) (ComfyNode, error) {
 			if err != nil {
 				return result, err
 			}
+			_, found := metaMap["comfyctl"]
+			if found {
+				comfyCtlMap, err := extractMap(metaMap, "comfyctl")
+				if err != nil {
+					return result, err
+				}
+				result.MarkerRole = comfyCtlMap["role"].(string)
+				result.MarkerInput = comfyCtlMap["input"].(string)
+			}
 		}
 	}
 	return result, nil

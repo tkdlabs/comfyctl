@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 )
 
@@ -45,6 +46,26 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+func (c ComfyWorkflow) ResolveRole(role string) ([]InputRef, error) {
+	if refs := c.markedRefs(role); len(refs) > 0 {
+		return refs, nil // user-marked refs
+	}
+	return findByRole(c, role)
+}
+
+func (c ComfyWorkflow) markedRefs(role string) []InputRef {
+	var refs []InputRef
+	for id, node := range c.Nodes {
+		if node.MarkerRole != role {
+			continue
+		}
+		t := node.Inputs[node.MarkerInput].Type
+		refs = append(refs, InputRef{nodeId: id, inputId: node.MarkerInput, inputType: t})
+	}
+	sort.Slice(refs, func(i, j int) bool { return refs[i].nodeId < refs[j].nodeId })
+	return refs
 }
 
 func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
@@ -128,9 +149,11 @@ func (cw ComfyWorkflow) WriteOut(writer io.Writer) error {
 
 // Node
 type ComfyNode struct {
-	Inputs    map[string]ComfyNodeInput
-	ClassType string
-	Title     string
+	Inputs      map[string]ComfyNodeInput
+	ClassType   string
+	Title       string
+	MarkerRole  string
+	MarkerInput string
 }
 
 // one-of

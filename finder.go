@@ -2,10 +2,39 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"slices"
 	"strings"
 )
+
+func findByRole(cw ComfyWorkflow, role string) ([]InputRef, error) {
+	switch role {
+	case "seed":
+		return FindSeed(cw)
+	case "positive":
+		return one(FindPositivePrompt(cw))
+	case "negative":
+		return one(FindNegativePrompt(cw))
+	case "width":
+		return one(FindWidth(cw))
+	case "height":
+		return one(FindHeight(cw))
+	case "fps":
+		return one(FindFps(cw))
+	case "image":
+		return one(FindImage(cw))
+	default:
+		return nil, fmt.Errorf("unkown role: %s", role)
+	}
+}
+
+func one(ref InputRef, err error) ([]InputRef, error) {
+	if err != nil {
+		return nil, err
+	}
+	return []InputRef{ref}, nil
+}
 
 func FindHeight(workflow ComfyWorkflow) (InputRef, error) {
 	for k, node := range workflow.Nodes {

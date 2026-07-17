@@ -32,46 +32,21 @@ func cmdSet(args []string) error {
 	if err != nil {
 		return fmt.Errorf("Error opening %s: %v\n", args[0], err)
 	}
-	var inputRefs []InputRef = make([]InputRef, 0)
-	var inputRef InputRef
-	switch args[0] {
-	case "positive":
-		inputRef, err = FindPositivePrompt(cw)
-	case "negative":
-		inputRef, err = FindNegativePrompt(cw)
-	case "width":
-		inputRef, err = FindWidth(cw)
-	case "height":
-		inputRef, err = FindHeight(cw)
-	case "fps":
-		inputRef, err = FindFps(cw)
-	case "batch":
-		inputRef, err = FindBatchSize(cw)
-	case "seed":
-		inputRefs, err = FindSeed(cw)
-	case "image":
-		inputRef, err = FindImage(cw)
-	default:
-		return fmt.Errorf("Unknown property: %s\n\n%s", args[0], setUsage)
-	}
-	if inputRef != (InputRef{}) {
-		inputRefs = append(inputRefs, inputRef)
-	}
+	refs, err := cw.ResolveRole(args[0])
 	if err != nil {
 		return fmt.Errorf("Unable to find '%s'. Check the dump command first.", args[0])
 	}
 	var valueStr string = args[1]
-	for _, inputRef := range inputRefs {
-		if args[0] == "width" || args[0] == "height" || args[0] == "fps" ||
-			args[0] == "batch" || args[0] == "seed" {
+	for _, ref := range refs {
+		if isIntRole(args[0]) {
 			valueInt64, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				return fmt.Errorf("For %s property expected value to be int. But got: %s",
 					args[0], args[1])
 			}
-			cw.SetInt(inputRef, valueInt64)
+			cw.SetInt(ref, valueInt64)
 		} else {
-			cw.SetString(inputRef, valueStr)
+			cw.SetString(ref, valueStr)
 		}
 	}
 	err = cw.WriteOut(os.Stdout)
@@ -79,4 +54,8 @@ func cmdSet(args []string) error {
 		return fmt.Errorf("I/O error writing out json workflow: %v", err)
 	}
 	return nil
+}
+
+func isIntRole(role string) bool {
+	return role == "width" || role == "height" || role == "fps" || role == "batch" || role == "seed"
 }
