@@ -147,7 +147,8 @@ func FindPositivePrompt(workflow ComfyWorkflow) (InputRef, error) {
 		if !found {
 			continue
 		}
-		ref, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "positive", "prompt", "conditioning"},
+		ref, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "positive", "prompt", "conditioning",
+			"on_true", "on_false"},
 			[]string{"ConditioningZeroOut"})
 		if found {
 			return ref, nil

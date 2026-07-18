@@ -18,17 +18,30 @@ only legacy `KSampler` and the bytedance API nodes still hit.
 - Coverage now 26/26.
 
 ### 2. Prompt crawl dead-ends at routing / processing nodes
-- **LTX2 t2v/i2v/ia2v — positive lost.** Chain is
+Boundary that resolves this class: **crawl through *routing*, mark through
+*merges*.** A pass-through node (Switch, Reroute, single-input conditioning
+chain) still has exactly one semantic source upstream, so following it is safe
+and heuristic-correct. A fan-in node (Concatenate, multiple primitives) is where
+semantics genuinely branch — no reliable signal picks the right source, so
+guessing risks *silently* writing the wrong input. Resolve those by marker.
+
+- **LTX2 t2v/i2v/ia2v — positive lost. DONE.** Chain was
   `CFGGuider.positive -> LTXVConditioning -> CLIPTextEncode.text -> ComfySwitchNode`
-  (`on_true`/`on_false`/`switch`). `followInputs` lacks those keys, so the crawl
-  stops at the Switch. Negative is found only because its `CLIPTextEncode.text`
-  is an inline string.
-- **krea2 t2i — positive lost entirely.**
-  `CLIPTextEncode.text -> StringConcatenate` (`string_a`/`string_b`)
-  `-> PrimitiveStringMultiline.value`, plus a `TextGenerate` LLM node. The crawl
-  lacks `string_a`/`string_b`, dead-ends.
-- **Fix (stopgap):** extend `followInputs` with routing keys.
-- **Fix (real):** see architectural note below.
+  (`on_true`/`on_false`/`switch`). `followInputs` lacked those keys, so the crawl
+  stopped at the Switch. Fixed by adding `on_true`/`on_false` to the positive
+  crawl — a pure routing pass-through, exactly the safe case. All three LTX2
+  workflows now resolve `positive`.
+- **krea2 t2i — positive not found; resolve via markers, do NOT crawl.**
+  `CLIPTextEncode.text -> StringConcatenate` (`string_a`/`string_b`) merges two
+  `PrimitiveStringMultiline` nodes (system prompt + user prompt), with a
+  `TextGenerate` LLM node in the mix. This is a fan-in: nothing reliably says
+  which side is the user's prompt, and a heuristic that guesses could overwrite
+  the *system* prompt on `set positive` — silent corruption, worse than a miss.
+  The crawl correctly dead-ends and returns not-found today. Intended fix is the
+  `mark` write path: mark the real prompt as `positive` (marker-first overrides
+  the failed heuristic, keeping `set positive` uniform across workflows) and the
+  system prompt as a custom `system` role. This is the text-side twin of the
+  "multiple `LoadImage` refs" case under Roles & markers.
 
 ### 3. Titled-node branch bails on a node-ref and spams stderr
 In `image_flux2_klein_text_to_image.json` the node titled
