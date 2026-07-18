@@ -43,22 +43,36 @@ guessing risks *silently* writing the wrong input. Resolve those by marker.
   system prompt as a custom `system` role. This is the text-side twin of the
   "multiple `LoadImage` refs" case under Roles & markers.
 
-### 3. Titled-node branch bails on a node-ref and spams stderr
+### 3. Titled-node branch bails on a node-ref and spams stderr — DONE (fe6f350)
 In `image_flux2_klein_text_to_image.json` the node titled
 `CLIP Text Encode (Positive Prompt)` has `text` = a *ref* to a `PrimitiveString`,
-not an inline string. The fuzzy-title branch requires `ComfyTextInput`, hits
-`log.Printf("Weird, node with input 'text' is not string...")` on stderr, and
-gives up. The fallback saves it, but every run leaks the log line.
-- **Fix:** when the titled node's `text` is a `ComfyNodeRef`, crawl into it
-  instead of bailing; drop the log or gate it behind a verbose flag.
+not an inline string. The fuzzy-title branch required `ComfyTextInput`, logged
+`Weird, node with input 'text' is not string...` to stderr, and gave up.
+- **Fix applied:** dropped the log line and let the branch fall through; the
+  `positive`/`prompt` fallback crawl resolves it silently. (If the titled node
+  ever needs to be *preferred* over the fallback, crawl into the ref there
+  instead of continuing — not needed today.)
 
-### 4. Cloud / API nodes use node-specific field names
-`ByteDanceTextToVideoNode` has a direct `prompt` input (no `positive`, no
-`CLIPTextEncode` anchor); `api_wan2_7_i2v` has none of `positive`/`prompt`/title.
-These can't be found at all.
-- **Fix:** add `prompt` as a positive anchor for a free partial win; full
-  support likely needs a class_type -> field mapping. Lower priority (API
-  workflows are a distinct submode).
+### 4. Cloud / API nodes use node-specific field names — partial (common case DONE)
+- **DONE — `prompt` anchor.** All three ByteDance nodes
+  (`ByteDance{TextToVideo,ImageToVideo,FirstLastFrame}Node`) expose a flat
+  `prompt` input. Added `prompt` to the positive anchor set (`any_found`), so
+  they now resolve — 3 of the 4 API workflows.
+- **Bespoke / namespaced fields → mark, don't whitelist.** `api_wan2_7_i2v`
+  (`Wan2ImageToVideoApi`) names its fields `model.prompt` / `model.negative_prompt`
+  — dotted namespaces, so no flat anchor hits. This is the un-findable tail, and
+  chasing it is a losing game: the next provider will be `params.text` /
+  `input.caption`, and a `class_type -> field` table only ever covers nodes
+  already seen. Do **not** reach for substring matching either — `model.negative_prompt`
+  contains `prompt`, so a `contains("prompt")` positive anchor would grab the
+  *negative* field. Resolve by marker: these nodes are flat (prompt is a direct
+  scalar input on one node, no crawl, no ambiguity), so `mark positive <nodeId>`
+  is trivially correct. Same boundary as #2 — anchor the common/stable names,
+  mark the bespoke tail.
+- **When building the mark path:** negative has the identical story
+  (`model.negative_prompt`); and exercise the marked-input round-trip on a
+  **dotted key** to confirm the `.` in the input name survives parse -> `set` ->
+  write-out (should be fine — it's just a map key — but verify).
 
 ### 5. `set` updates only one node; multi-seed workflows go half-updated — DONE (04b132e)
 An attribute can map to N nodes, but `Find*` returned a single `InputRef` and

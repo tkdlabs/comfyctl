@@ -134,7 +134,6 @@ func FindPositivePrompt(workflow ComfyWorkflow) (InputRef, error) {
 				continue
 			}
 			if nodeInput.Type != ComfyTextInput {
-				log.Printf("Weird, node with input 'text' is not string, but %v", nodeInput.Type)
 				continue
 			}
 			return InputRef{nodeId: k, inputId: "text", inputType: ComfyTextInput}, nil
@@ -143,8 +142,7 @@ func FindPositivePrompt(workflow ComfyWorkflow) (InputRef, error) {
 
 	// Look for inputs "positive" and walk back to "text"
 	for k, node := range workflow.Nodes {
-		_, found := node.Inputs["positive"]
-		if !found {
+		if !any_found(node.Inputs, "positive", "prompt") {
 			continue
 		}
 		ref, found := crawlUntilFoundText(workflow, k, []string{"value", "text", "positive", "prompt", "conditioning",
@@ -157,6 +155,16 @@ func FindPositivePrompt(workflow ComfyWorkflow) (InputRef, error) {
 	return InputRef{}, errors.New("Unable to find positive prompt in the workflow")
 }
 
+func any_found(inputs map[string]ComfyNodeInput, keys ...string) bool {
+	for _, key := range keys {
+		_, found := inputs[key]
+		if found {
+			return true
+		}
+	}
+	return false
+}
+
 func FindNegativePrompt(workflow ComfyWorkflow) (InputRef, error) {
 
 	// Fuzzy search for node that has "Positive Prompt" in title
@@ -167,7 +175,6 @@ func FindNegativePrompt(workflow ComfyWorkflow) (InputRef, error) {
 				continue
 			}
 			if nodeInput.Type != ComfyTextInput {
-				log.Printf("Weird, node with input 'text' is not string, but %v", nodeInput.Type)
 				continue
 			}
 			return InputRef{nodeId: k, inputId: "text", inputType: ComfyTextInput}, nil
