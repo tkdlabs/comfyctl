@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 )
@@ -39,6 +40,10 @@ func cmdSet(args []string) error {
 	var valueStr string = args[1]
 	for _, ref := range refs {
 		if isIntRole(args[0]) {
+			if valueStr == "random" {
+				cw.SetInt(ref, rand.Int63())
+				continue
+			}
 			valueInt64, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				return fmt.Errorf("For %s property expected value to be int. But got: %s",

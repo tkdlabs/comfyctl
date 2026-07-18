@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -204,6 +205,87 @@ func TestSetSeedUpdatesAllNodes(t *testing.T) {
 			if len(stale) > 0 {
 				t.Errorf("set seed left %d/%d enabled seed nodes stale: %v",
 					len(stale), len(before), stale)
+			}
+		})
+	}
+}
+
+// runSet drives the real cmdSet end-to-end by swapping os.Stdin/os.Stdout,
+// so the "set seed random" branch, role resolution, and JSON round-trip are
+// all exercised as the user would hit them. Not parallel-safe (mutates global
+// stdio); relies on go test running functions sequentially.
+func runSet(t *testing.T, inputPath string, args ...string) []byte {
+	t.Helper()
+	in, err := os.Open(inputPath)
+	if err != nil {
+		t.Fatalf("open input: %v", err)
+	}
+	defer in.Close()
+
+	out, err := os.CreateTemp(t.TempDir(), "set-out-*.json")
+	if err != nil {
+		t.Fatalf("temp out: %v", err)
+	}
+	defer out.Close()
+
+	oldIn, oldOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = in, out
+	err = cmdSet(args)
+	os.Stdin, os.Stdout = oldIn, oldOut
+	if err != nil {
+		t.Fatalf("cmdSet %v: %v", args, err)
+	}
+
+	b, err := os.ReadFile(out.Name())
+	if err != nil {
+		t.Fatalf("read out: %v", err)
+	}
+	return b
+}
+
+// TestSetSeedRandom validates `set seed random`: every enabled seed node must
+// end up holding a fresh, canonical int64 (no float corruption, no scientific
+// notation), different from its original value. Uses the raw-map oracle so it
+// is independent of the finder heuristics, and covers single- and multi-seed
+// workflows alike.
+func TestSetSeedRandom(t *testing.T) {
+	for _, path := range testdataFiles(t) {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			orig, err := openFile(t, path)
+			if err != nil {
+				t.Skipf("parse failed: %v", err)
+			}
+			before := enabledSeedNodes(orig.Raw)
+			if len(before) == 0 {
+				t.Skip("no enabled seed node")
+			}
+
+			out := runSet(t, path, "seed", "random")
+
+			got, err := OpenComfyWorkflow(bytes.NewReader(out))
+			if err != nil {
+				t.Fatalf("output does not parse back: %v", err)
+			}
+			after := enabledSeedNodes(got.Raw)
+
+			for id, old := range before {
+				nv, ok := after[id]
+				if !ok {
+					t.Errorf("node %s lost its seed after set random", id)
+					continue
+				}
+				n, err := strconv.ParseInt(nv, 10, 64)
+				if err != nil {
+					t.Errorf("node %s seed %q is not a valid int64: %v", id, nv, err)
+					continue
+				}
+				if strconv.FormatInt(n, 10) != nv {
+					t.Errorf("node %s seed %q is not a canonical integer (precision/format lost)", id, nv)
+				}
+				if nv == old {
+					t.Errorf("node %s seed unchanged (%s); random did not write", id, old)
+				}
 			}
 		})
 	}
