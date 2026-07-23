@@ -44,7 +44,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-func cmdSubmit(args []string) error {
-	return nil
-}
