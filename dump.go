@@ -41,9 +41,6 @@ var PredefinedRoles = map[string]roleDescriptor{
 
 func cmdDump(args []string) error {
 	display := make(map[string]roleDescriptor)
-	if len(args) == 0 {
-		display = maps.Clone(PredefinedRoles)
-	}
 	for _, arg := range args {
 		switch arg {
 		case "positive", "negative", "width", "height", "batch", "fps", "image", "seed":
@@ -57,6 +54,18 @@ func cmdDump(args []string) error {
 	if err != nil {
 		return fmt.Errorf("Error parsing workflow: %v\n", err)
 	}
+	if len(args) == 0 {
+		display = maps.Clone(PredefinedRoles)
+		extra_markers, err := cw.FindAllMarkedRoles()
+		if err != nil {
+			fmt.Printf("Error while scanning for marked roles, will stick to predefined ones: %v\n", err)
+		} else {
+			for _, role := range extra_markers {
+				display[role] = roleDescriptor { fmt.Sprintf("custom role marker: '%s'", role) }
+			}
+		}
+	}
+	
 
 	sortedDisplayKeys := slices.Sorted(maps.Keys(display))
 

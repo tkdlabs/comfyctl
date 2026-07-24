@@ -134,6 +134,19 @@ func (cw ComfyWorkflow) FindRole(role string) (string, error) {
 	return "", nil
 }
 
+func (cw ComfyWorkflow) FindAllMarkedRoles() ([]string, error) {
+	res := []string {}
+	if !cw.NodesSynced {
+		return []string {}, fmt.Errorf("The parsed nodes are not synced to current version.")
+	}
+	for _, node := range cw.Nodes {
+		if node.MarkerRole != "" {
+			res = append(res, node.MarkerRole)
+		}
+	}
+	return res, nil
+}
+
 // ClearMark removes the comfyctl marker (if any) from a node.
 func (cw *ComfyWorkflow) ClearMark(nodeId string) error {
 	nodeRawMap, err := cw.getRawNodeIdMap(nodeId)
