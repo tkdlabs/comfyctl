@@ -53,7 +53,7 @@ func cmdDump(args []string) error {
 	if requested {
 		posPrompt, err := FindPositivePrompt(cw)
 		if err != nil {
-			fmt.Printf("Failed to find negative prompt: %v\n", err)
+			fmt.Printf("Failed to find positive prompt: %v\n", err)
 		} else {
 			val, _ := cw.Resolve(posPrompt)
 			fmt.Printf("Found positive prompt %s\n", val)

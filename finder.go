@@ -24,6 +24,8 @@ func findByRole(cw ComfyWorkflow, role string) ([]InputRef, error) {
 		return one(FindFps(cw))
 	case "image":
 		return one(FindImage(cw))
+	case "batch":
+		return one(FindBatchSize(cw))
 	default:
 		return nil, fmt.Errorf("unkown role: %s", role)
 	}
