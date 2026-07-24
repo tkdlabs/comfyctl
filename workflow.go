@@ -213,6 +213,8 @@ func (cw ComfyWorkflow) getRawInputMap(inputRef InputRef) (map[string]any, error
 
 func (cw ComfyWorkflow) WriteOut(writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
+	// pretty printing
+	encoder.SetIndent("", "    ")
 	return encoder.Encode(cw.Raw)
 }
 
