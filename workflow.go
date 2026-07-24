@@ -98,9 +98,8 @@ func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
 }
 
 func (c ComfyWorkflow) resolveClass(nodeId string) string {
-	// No error checking!!!
-	node, _ := c.Nodes[nodeId]
-	return node.ClassType
+	// Returns "" for an unknown node.
+	return c.Nodes[nodeId].ClassType
 }
 
 func (cw *ComfyWorkflow) SetString(inputRef InputRef, value string) error {
@@ -135,8 +134,23 @@ func (cw ComfyWorkflow) FindRole(role string) (string, error) {
 	return "", nil
 }
 
-func (cw *ComfyWorkflow) ClearMark(node string) error {
-	return cw.MarkRole(InputRef{node, "", UnknownNodeInputType}, "")
+// ClearMark removes the comfyctl marker (if any) from a node.
+func (cw *ComfyWorkflow) ClearMark(nodeId string) error {
+	nodeRawMap, err := cw.getRawNodeIdMap(nodeId)
+	if err != nil {
+		return fmt.Errorf("Unable to locate the node to clear [%s]: %v", nodeId, err)
+	}
+	metaMapRaw, found := nodeRawMap["_meta"]
+	if !found {
+		return nil // no _meta, nothing to clear
+	}
+	metaMapRawMap, ok := metaMapRaw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("Workflow error: the _meta attribute of node %s is not a JSON map", nodeId)
+	}
+	delete(metaMapRawMap, "comfyctl")
+	cw.NodesSynced = false
+	return nil
 }
 
 func (cw *ComfyWorkflow) MarkRole(inputRef InputRef, role string) error {
@@ -159,9 +173,7 @@ func (cw *ComfyWorkflow) MarkRole(inputRef InputRef, role string) error {
 	if !ok {
 		return fmt.Errorf("Workflow error: the _meta attribute of node %s is not a JSON map", inputRef.nodeId)
 	}
-	metaMapRawMap["comfyctl"] = make(map[string]any)
-	metaMapRawMap["comfyctl"].(map[string]any)["role"] = role
-	metaMapRawMap["comfyctl"].(map[string]any)["input"] = inputRef.inputId
+	metaMapRawMap["comfyctl"] = map[string]any{"role": role, "input": inputRef.inputId}
 	cw.NodesSynced = false
 	return nil
 }

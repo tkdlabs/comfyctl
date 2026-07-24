@@ -64,13 +64,12 @@ func cmdMark(args []string) error {
 	if opts.workflowPath == "" {
 		reader = bufio.NewReader(os.Stdin)
 	} else {
-		var err error
 		file, err := os.Open(opts.workflowPath)
-		reader = file
 		if err != nil {
 			return fmt.Errorf("Unable to open workflow file: %s: %v", opts.workflowPath, err)
 		}
 		defer file.Close()
+		reader = file
 	}
 	cw, err := OpenComfyWorkflow(reader)
 	if err != nil {
@@ -91,11 +90,7 @@ func cmdMark(args []string) error {
 			return fmt.Errorf("Error marking role %v: %v", opts.ref, err)
 		}
 	} else {
-		inputs, err := FindAllNonRefInputs(cw)
-		if err != nil {
-			return fmt.Errorf("Unable to find all non-ref inputs in workflow: %v", err)
-		}
-		for i, input := range inputs {
+		for i, input := range FindAllNonRefInputs(cw) {
 			val, err := cw.Resolve(input)
 			if err != nil {
 				return fmt.Errorf("Error resolving %v: %v", input, err)
@@ -110,13 +105,12 @@ func cmdMark(args []string) error {
 	if opts.workflowPath == "" {
 		writer = os.Stdout
 	} else {
-		var err error
 		file, err := os.Create(opts.workflowPath)
-		writer = file
 		if err != nil {
 			return fmt.Errorf("Unable to open workflow file for writing: %s: %v", opts.workflowPath, err)
 		}
 		defer file.Close()
+		writer = file
 	}
 	err = cw.WriteOut(writer)
 	if err != nil {

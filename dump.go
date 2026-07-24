@@ -8,6 +8,7 @@ import (
 	"slices"
 )
 
+// TODO: rework
 const dumpUsage = `comfyctl dump <what> - tries to find workflow crucial data that can be overridden
 
 Note: this uses best-effort finding algorithm (TODO: markers)
@@ -39,9 +40,9 @@ var PredefinedRoles = map[string]roleDescriptor{
 }
 
 func cmdDump(args []string) error {
-	var display map[string]roleDescriptor = make(map[string]roleDescriptor)
+	display := make(map[string]roleDescriptor)
 	if len(args) == 0 {
-		display = PredefinedRoles
+		display = maps.Clone(PredefinedRoles)
 	}
 	for _, arg := range args {
 		switch arg {
@@ -65,8 +66,12 @@ func cmdDump(args []string) error {
 			fmt.Printf("Failed to find %s: %v\n", display[k].RoleText, err)
 		} else {
 			for _, valref := range vals {
-				val, _ := cw.Resolve(valref)
-				fmt.Printf("Found %s: %v\n", display[k].RoleText, val)
+				val, err := cw.Resolve(valref)
+				if err != nil {
+					fmt.Printf("Error resolving %s (%s:%s): %v\n", display[k].RoleText, valref.nodeId, valref.inputId, err)
+				} else {
+					fmt.Printf("Found %s: %v\n", display[k].RoleText, val)
+				}
 			}
 		}
 	}

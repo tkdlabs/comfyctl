@@ -140,6 +140,21 @@ Changes needed (once the `mark` write path exists):
    role + node count. Discoverability guard against the one footgun: a typo in
    `mark` silently creates a phantom role. Optionally warn in `mark` when a role
    name is new to the file.
+4. **Overwrite protection on `mark` (one marker per node).** The model stores a
+   single `MarkerRole`/`MarkerInput` per `ComfyNode`, and `MarkRole` replaces the
+   node's whole `_meta.comfyctl` submap — so marking a second input on a node
+   silently overwrites the first, and re-marking a role that already lives on
+   another node silently strands the old marker (relevant to the krea2 case in #2
+   if user + system prompt share a node). Two clobber paths, same fix:
+   - `mark` should **error out** when the target node already has a marker, or
+     when `[role]` is already marked elsewhere, **unless** a `-f`/`--overwrite`
+     flag is passed. Today `cmdMark` only prints a warning and proceeds.
+   - When overwriting a role that lives on a *different* node, call `ClearMark`
+     on the old node first, so the role doesn't end up marked in two places.
+     (`cmdMark` currently never calls `ClearMark` — this is the missing call.)
+   - Longer-term alternative to the per-node ceiling: make `_meta.comfyctl` a
+     list of markers instead of a single object, so one node can carry several
+     roles. Decide before the format is relied on downstream.
 
 ### Design stance
 Keep roles **schema-less and per-file**: the workflow's `_meta.comfyctl` markers

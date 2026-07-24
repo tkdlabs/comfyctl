@@ -211,7 +211,7 @@ func FindImage(workflow ComfyWorkflow) (InputRef, error) {
 	return InputRef{}, errors.New("Unable to find source image in the workflow")
 }
 
-func FindAllNonRefInputs(workflow ComfyWorkflow) ([]InputRef, error) {
+func FindAllNonRefInputs(workflow ComfyWorkflow) []InputRef {
 	var res []InputRef
 	for k, node := range workflow.Nodes {
 		for ki, input := range node.Inputs {
@@ -220,7 +220,7 @@ func FindAllNonRefInputs(workflow ComfyWorkflow) ([]InputRef, error) {
 			}
 		}
 	}
-	return res, nil
+	return res
 }
 
 func crawlUntilFoundText(workflow ComfyWorkflow, startNode string, followInputs []string, bannedClasses []string) (InputRef, bool) {

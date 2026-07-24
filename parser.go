@@ -75,8 +75,16 @@ func parseComfyNode(node_map map[string]any) (ComfyNode, error) {
 				if err != nil {
 					return result, err
 				}
-				result.MarkerRole = comfyCtlMap["role"].(string)
-				result.MarkerInput = comfyCtlMap["input"].(string)
+				role, ok := comfyCtlMap["role"].(string)
+				if !ok {
+					return result, fmt.Errorf("malformed _meta.comfyctl marker: 'role' missing or not a string")
+				}
+				input, ok := comfyCtlMap["input"].(string)
+				if !ok {
+					return result, fmt.Errorf("malformed _meta.comfyctl marker: 'input' missing or not a string")
+				}
+				result.MarkerRole = role
+				result.MarkerInput = input
 			}
 		}
 	}
