@@ -1,1 +1,4 @@
 /comfyctl
+
+# ComfyUI generation outputs
+*.png

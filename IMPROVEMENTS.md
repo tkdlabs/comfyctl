@@ -31,7 +31,7 @@ guessing risks *silently* writing the wrong input. Resolve those by marker.
   stopped at the Switch. Fixed by adding `on_true`/`on_false` to the positive
   crawl — a pure routing pass-through, exactly the safe case. All three LTX2
   workflows now resolve `positive`.
-- **krea2 t2i — positive not found; resolve via markers, do NOT crawl.**
+- **krea2 t2i — positive not found; resolve via markers, do NOT crawl. DONE.**
   `CLIPTextEncode.text -> StringConcatenate` (`string_a`/`string_b`) merges two
   `PrimitiveStringMultiline` nodes (system prompt + user prompt), with a
   `TextGenerate` LLM node in the mix. This is a fan-in: nothing reliably says
@@ -162,6 +162,17 @@ Keep roles **schema-less and per-file**: the workflow's `_meta.comfyctl` markers
 self-describing, which fits a tool whose job is "read a workflow, act on it."
 The `roles` command reads them back; no external state to keep in sync.
 
-### Still gated on
+### Round-trip — VERIFIED
 The `_meta.comfyctl` round-trip through ComfyUI's `/prompt` endpoint is
-unverified. Confirm a marked workflow still submits before relying on markers.
+confirmed: a marked krea2 workflow submits and generates with the markers
+present. ComfyUI ignores the extra `_meta.comfyctl` key rather than rejecting
+it, so markers are safe to rely on end-to-end. Exercised on a live host:
+
+    cat image_krea2_turbo_t2i.json \
+      | comfyctl set positive "A knight fighting another knight ..." \
+      | comfyctl submit --host http://...:8188
+    # submitted, prompt id: d40791e7-...; Krea2_turbo_00064_.png
+
+This also closes the krea2 case in #2: the marked prompt overrides the failed
+heuristic, `set positive` writes the right side of the fan-in, and the result
+submits cleanly.
