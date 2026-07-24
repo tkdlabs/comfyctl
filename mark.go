@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -60,9 +61,11 @@ func cmdMark(args []string) error {
 		opts.ref = inpRef
 	}
 
+	var isStdin = false
 	var reader io.Reader
 	if opts.workflowPath == "" {
 		reader = bufio.NewReader(os.Stdin)
+		isStdin = true
 	} else {
 		file, err := os.Open(opts.workflowPath)
 		if err != nil {
@@ -90,16 +93,43 @@ func cmdMark(args []string) error {
 			return fmt.Errorf("Error marking role %v: %v", opts.ref, err)
 		}
 	} else {
+		var mapToRef map[int]InputRef = make(map[int]InputRef)
 		for i, input := range FindAllNonRefInputs(cw) {
 			val, err := cw.Resolve(input)
 			if err != nil {
 				return fmt.Errorf("Error resolving %v: %v", input, err)
 			}
+			mapToRef[i+1] = input
 			fmt.Printf("%d: {class:%s} [%s:%s]  %v\n", i+1, cw.resolveClass(input.nodeId), input.nodeId, input.inputId, val)
 		}
-		return fmt.Errorf("This is not fully implemented. Pick the reference [xxx] and use 'mark %s [xxx]' option with that value\n", opts.role)
-	}
+		if isStdin {
+			return fmt.Errorf(`You are piping input file to stdin. Interactive mode is not going to work.
+		                   Pick the reference [xxx] and use 'mark %s [xxx]' option with that value`, opts.role)
+		} else {
+			scanner := bufio.NewScanner(os.Stdin)
+			fmt.Printf("Enter option %d-%d\n", 1, len(mapToRef))
+			for {
+				if !scanner.Scan() {
+					break
+				}
+				input := strings.TrimSpace(scanner.Text())
+				number, err := strconv.ParseInt(input, 10, 64)
+				if err == nil && number >= 1 && number <= int64(len(mapToRef)) {
+					n := int(number)
+					fmt.Printf("Applying %s role to %s:%s ref\n", opts.role, mapToRef[n].nodeId,
+						mapToRef[n].inputId)
+					err := cw.MarkRole(mapToRef[n], opts.role)
+					if err != nil {
+						return fmt.Errorf("Error marking role: %v", err)
+					}
+					break
+				} else {
+					fmt.Printf("Try again, only enter number between %d and %d\n", 1, len(mapToRef))
+				}
+			}
 
+		}
+	}
 	// Write out
 	var writer io.Writer
 	if opts.workflowPath == "" {
