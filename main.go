@@ -28,6 +28,8 @@ func main() {
 	switch cmd {
 	case "dump":
 		err = cmdDump(cmdArgs)
+	case "mark":
+		err = cmdMark(cmdArgs)
 	case "set":
 		err = cmdSet(cmdArgs)
 	case "submit":

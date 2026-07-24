@@ -97,6 +97,12 @@ func (c ComfyWorkflow) Resolve(inputRef InputRef) (any, error) {
 	return nil, errors.New("Unknown node type!")
 }
 
+func (c ComfyWorkflow) resolveClass(nodeId string) string {
+	// No error checking!!!
+	node, _ := c.Nodes[nodeId]
+	return node.ClassType
+}
+
 func (cw *ComfyWorkflow) SetString(inputRef InputRef, value string) error {
 	inputMap, err := cw.getRawInputMap(inputRef)
 	if err != nil {
@@ -117,14 +123,65 @@ func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
 	return nil
 }
 
-func (cw ComfyWorkflow) getRawInputMap(inputRef InputRef) (map[string]any, error) {
-	nodeRaw, found := cw.Raw[inputRef.nodeId]
+func (cw ComfyWorkflow) FindRole(role string) (string, error) {
+	if !cw.NodesSynced {
+		return "", fmt.Errorf("The parsed nodes are not synced to current version.")
+	}
+	for k, node := range cw.Nodes {
+		if node.MarkerRole == role {
+			return k, nil
+		}
+	}
+	return "", nil
+}
+
+func (cw *ComfyWorkflow) ClearMark(node string) error {
+	return cw.MarkRole(InputRef{node, "", UnknownNodeInputType}, "")
+}
+
+func (cw *ComfyWorkflow) MarkRole(inputRef InputRef, role string) error {
+	nodeRawMap, err := cw.getRawNodeIdMap(inputRef.nodeId)
+	if err != nil {
+		return fmt.Errorf("Unable to locate the node to mark [%s]: %v", inputRef.nodeId, err)
+	}
+	// check if inputId exists
+	_, err = cw.getRawInputMap(inputRef)
+	if err != nil {
+		return fmt.Errorf("Unable to locate input in the node [%s:%s]: %v", inputRef.nodeId,
+			inputRef.inputId, err)
+	}
+	metaMapRaw, found := nodeRawMap["_meta"]
 	if !found {
-		return nil, fmt.Errorf("Internal error. Node %s found in structured but not raw maps.", inputRef.nodeId)
+		nodeRawMap["_meta"] = make(map[string]any)
+		metaMapRaw = nodeRawMap["_meta"]
+	}
+	metaMapRawMap, ok := metaMapRaw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("Workflow error: the _meta attribute of node %s is not a JSON map", inputRef.nodeId)
+	}
+	metaMapRawMap["comfyctl"] = make(map[string]any)
+	metaMapRawMap["comfyctl"].(map[string]any)["role"] = role
+	metaMapRawMap["comfyctl"].(map[string]any)["input"] = inputRef.inputId
+	cw.NodesSynced = false
+	return nil
+}
+
+func (cw ComfyWorkflow) getRawNodeIdMap(nodeId string) (map[string]any, error) {
+	nodeRaw, found := cw.Raw[nodeId]
+	if !found {
+		return nil, fmt.Errorf("Internal error. Node %s not found in raw maps.", nodeId)
 	}
 	nodeRawMap, ok := nodeRaw.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", inputRef.nodeId)
+		return nil, fmt.Errorf("Internal error. Node %s is not structured as map in raw format.", nodeId)
+	}
+	return nodeRawMap, nil
+}
+
+func (cw ComfyWorkflow) getRawInputMap(inputRef InputRef) (map[string]any, error) {
+	nodeRawMap, err := cw.getRawNodeIdMap(inputRef.nodeId)
+	if err != nil {
+		return nil, err
 	}
 	inputMapRaw, found := nodeRawMap["inputs"]
 	if !found {

@@ -2,9 +2,10 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 )
 
 const dumpUsage = `comfyctl dump <what> - tries to find workflow crucial data that can be overridden
@@ -22,24 +23,32 @@ The following <What> attributes are supported. You can supply multiple <what>:
   batch:	batch size set in the workflow
   seed:		seed used to generate artifact`
 
+type roleDescriptor struct {
+	RoleText string
+}
+
+var PredefinedRoles = map[string]roleDescriptor{
+	"positive": {"positive prompt"},
+	"negative": {"negative prompt"},
+	"width":    {"width of output artifact"},
+	"height":   {"height of output artifact"},
+	"fps":      {"frames per second"},
+	"image":    {"input image"},
+	"batch":    {"batch size"},
+	"seed":     {"seed"},
+}
+
 func cmdDump(args []string) error {
-	var display map[string]struct{} = make(map[string]struct{})
+	var display map[string]roleDescriptor = make(map[string]roleDescriptor)
 	if len(args) == 0 {
-		display["positive"] = struct{}{}
-		display["negative"] = struct{}{}
-		display["width"] = struct{}{}
-		display["height"] = struct{}{}
-		display["batch"] = struct{}{}
-		display["fps"] = struct{}{}
-		display["image"] = struct{}{}
-		display["seed"] = struct{}{}
+		display = PredefinedRoles
 	}
 	for _, arg := range args {
 		switch arg {
 		case "positive", "negative", "width", "height", "batch", "fps", "image", "seed":
-			display[arg] = struct{}{}
+			display[arg] = PredefinedRoles[arg]
 		default:
-			return fmt.Errorf("Unknown artifact requested: %s\n\n%s", arg, dumpUsage)
+			display[arg] = roleDescriptor{fmt.Sprintf("custom role marker '%s'", arg)}
 		}
 	}
 	reader := bufio.NewReader(os.Stdin)
@@ -47,101 +56,19 @@ func cmdDump(args []string) error {
 	if err != nil {
 		return fmt.Errorf("Error parsing workflow: %v\n", err)
 	}
-	var requested bool
 
-	_, requested = display["positive"]
-	if requested {
-		posPrompt, err := FindPositivePrompt(cw)
-		if err != nil {
-			fmt.Printf("Failed to find positive prompt: %v\n", err)
-		} else {
-			val, _ := cw.Resolve(posPrompt)
-			fmt.Printf("Found positive prompt %s\n", val)
-		}
-	}
+	sortedDisplayKeys := slices.Sorted(maps.Keys(display))
 
-	_, requested = display["negative"]
-	if requested {
-		negPrompt, err := FindNegativePrompt(cw)
+	for _, k := range sortedDisplayKeys {
+		vals, err := cw.ResolveRole(k)
 		if err != nil {
-			fmt.Printf("Failed to find negative prompt: %v\n", err)
+			fmt.Printf("Failed to find %s: %v\n", display[k].RoleText, err)
 		} else {
-			val, _ := cw.Resolve(negPrompt)
-			fmt.Printf("Found negative prompt %s\n", val)
-		}
-	}
-
-	_, requested = display["height"]
-	if requested {
-		height, err := FindHeight(cw)
-		if err != nil {
-			fmt.Printf("Failed to find height: %v\n", err)
-		} else {
-			val, _ := cw.Resolve(height)
-			intval, _ := val.(json.Number).Int64()
-			fmt.Printf("Found height: %d\n", intval)
-		}
-	}
-
-	_, requested = display["width"]
-	if requested {
-		width, err := FindWidth(cw)
-		if err != nil {
-			fmt.Printf("Failed to find width: %v\n", err)
-		} else {
-			val, _ := cw.Resolve(width)
-			intval, _ := val.(json.Number).Int64()
-			fmt.Printf("Found width: %d\n", intval)
-		}
-	}
-
-	_, requested = display["batch"]
-	if requested {
-		batch_size, err := FindBatchSize(cw)
-		if err != nil {
-			fmt.Printf("Failed to find batch size: %v\n", err)
-		} else {
-			val, _ := cw.Resolve(batch_size)
-			intval, _ := val.(json.Number).Int64()
-			fmt.Printf("Found batch size: %d\n", intval)
-		}
-	}
-
-	_, requested = display["seed"]
-	if requested {
-		seeds, err := FindSeed(cw)
-		if err != nil {
-			fmt.Printf("Failed to find seed: %v\n", err)
-		} else {
-			for _, seed := range seeds {
-				val, _ := cw.Resolve(seed)
-				fmt.Printf("Found seed: %s\n", val.(json.Number).String())
+			for _, valref := range vals {
+				val, _ := cw.Resolve(valref)
+				fmt.Printf("Found %s: %v\n", display[k].RoleText, val)
 			}
 		}
 	}
-
-	_, requested = display["fps"]
-	if requested {
-		fps, err := FindFps(cw)
-		if err != nil {
-			fmt.Printf("Failed to find fps: %v\n", err)
-		} else {
-			val, _ := cw.Resolve(fps)
-			intval, _ := val.(json.Number).Int64()
-			fmt.Printf("Found fps: %d\n", intval)
-		}
-	}
-
-	_, requested = display["image"]
-	if requested {
-		imagesrc, err := FindImage(cw)
-		if err != nil {
-			fmt.Printf("Failed to find source image: %v\n", err)
-		} else {
-			val, _ := cw.Resolve(imagesrc)
-			fmt.Printf("Found source image: %s\n", val)
-		}
-	}
-
 	return nil
 }
