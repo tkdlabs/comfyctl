@@ -143,22 +143,10 @@ func parseNodeRef(nodeRef []any) (string, int64, error) {
 }
 
 func parseMetaTitle(metaMap map[string]any) (string, error) {
-	var result = ""
-	var found = false
-
-	for k := range metaMap {
-		if k == "title" {
-			titleVal, err := extractString(metaMap, k)
-			if err != nil {
-				return result, err
-			}
-			result = titleVal
-			found = true
-		}
+	// A missing title is fine: _meta may exist without one, e.g. when it was
+	// created solely to hold the comfyctl marker during a "mark" operation.
+	if _, found := metaMap["title"]; !found {
+		return "", nil
 	}
-	if found {
-		return result, nil
-	} else {
-		return result, fmt.Errorf("title not found in meta map: %v", metaMap)
-	}
+	return extractString(metaMap, "title")
 }
