@@ -135,9 +135,9 @@ func (cw ComfyWorkflow) FindRole(role string) (string, error) {
 }
 
 func (cw ComfyWorkflow) FindAllMarkedRoles() ([]string, error) {
-	res := []string {}
+	res := []string{}
 	if !cw.NodesSynced {
-		return []string {}, fmt.Errorf("The parsed nodes are not synced to current version.")
+		return []string{}, fmt.Errorf("The parsed nodes are not synced to current version.")
 	}
 	for _, node := range cw.Nodes {
 		if node.MarkerRole != "" {

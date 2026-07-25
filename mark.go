@@ -83,15 +83,17 @@ func cmdMark(args []string) error {
 		return fmt.Errorf("Internal error while finding existing marker of '%s' role: %v", opts.role, err)
 	}
 	if existingNode != "" {
-		fmt.Printf("Warning, workflow has already marked '%s' role on '%s' node.\n", opts.role, existingNode)
-		fmt.Printf("If this command writes, it will replace that marker\n")
+		fmt.Fprintf(os.Stderr, "Warning, workflow has already marked '%s' role on '%s' node.\n", opts.role, existingNode)
+		fmt.Fprintf(os.Stderr, "If this command writes, it will replace that marker\n")
 	}
 
+	marked := false
 	if opts.ref.nodeId != "" && opts.ref.inputId != "" {
 		err := cw.MarkRole(opts.ref, opts.role)
 		if err != nil {
 			return fmt.Errorf("Error marking role %v: %v", opts.ref, err)
 		}
+		marked = true
 	} else {
 		var mapToRef map[int]InputRef = make(map[int]InputRef)
 		for i, input := range FindAllNonRefInputs(cw) {
@@ -100,36 +102,44 @@ func cmdMark(args []string) error {
 				return fmt.Errorf("Error resolving %v: %v", input, err)
 			}
 			mapToRef[i+1] = input
-			fmt.Printf("%d: {class:%s} [%s:%s]  %v\n", i+1, cw.resolveClass(input.nodeId), input.nodeId, input.inputId, val)
+			fmt.Fprintf(os.Stderr, "%d: {class:%s} [%s:%s]  %v\n", i+1, cw.resolveClass(input.nodeId), input.nodeId, input.inputId, val)
 		}
 		if isStdin {
-			return fmt.Errorf(`You are piping input file to stdin. Interactive mode is not going to work.
-		                   Pick the reference [xxx] and use 'mark %s [xxx]' option with that value`, opts.role)
-		} else {
-			scanner := bufio.NewScanner(os.Stdin)
-			fmt.Printf("Enter option %d-%d\n", 1, len(mapToRef))
-			for {
-				if !scanner.Scan() {
-					break
-				}
-				input := strings.TrimSpace(scanner.Text())
-				number, err := strconv.ParseInt(input, 10, 64)
-				if err == nil && number >= 1 && number <= int64(len(mapToRef)) {
-					n := int(number)
-					fmt.Printf("Applying %s role to %s:%s ref\n", opts.role, mapToRef[n].nodeId,
-						mapToRef[n].inputId)
-					err := cw.MarkRole(mapToRef[n], opts.role)
-					if err != nil {
-						return fmt.Errorf("Error marking role: %v", err)
-					}
-					break
-				} else {
-					fmt.Printf("Try again, only enter number between %d and %d\n", 1, len(mapToRef))
-				}
+			return fmt.Errorf("You are piping input file to stdin. Interactive mode is not going to work.\n"+
+				"Pick the reference [xxx] and use 'mark %s [xxx]' option with that value", opts.role)
+		}
+		if len(mapToRef) == 0 {
+			return fmt.Errorf("No markable inputs found in the workflow")
+		}
+		scanner := bufio.NewScanner(os.Stdin)
+		fmt.Fprintf(os.Stderr, "Enter option %d-%d\n", 1, len(mapToRef))
+		for {
+			if !scanner.Scan() {
+				break
 			}
-
+			input := strings.TrimSpace(scanner.Text())
+			number, err := strconv.ParseInt(input, 10, 64)
+			if err == nil && number >= 1 && number <= int64(len(mapToRef)) {
+				n := int(number)
+				fmt.Fprintf(os.Stderr, "Applying %s role to %s:%s ref\n", opts.role, mapToRef[n].nodeId,
+					mapToRef[n].inputId)
+				err := cw.MarkRole(mapToRef[n], opts.role)
+				if err != nil {
+					return fmt.Errorf("Error marking role: %v", err)
+				}
+				marked = true
+				break
+			} else {
+				fmt.Fprintf(os.Stderr, "Try again, only enter number between %d and %d\n", 1, len(mapToRef))
+			}
 		}
 	}
+
+	if !marked {
+		fmt.Fprintln(os.Stderr, "No role marked; leaving workflow unchanged.")
+		return nil
+	}
+
 	// Write out
 	var writer io.Writer
 	if opts.workflowPath == "" {

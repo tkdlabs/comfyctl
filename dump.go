@@ -61,11 +61,10 @@ func cmdDump(args []string) error {
 			fmt.Printf("Error while scanning for marked roles, will stick to predefined ones: %v\n", err)
 		} else {
 			for _, role := range extra_markers {
-				display[role] = roleDescriptor { fmt.Sprintf("custom role marker: '%s'", role) }
+				display[role] = roleDescriptor{fmt.Sprintf("custom role marker '%s'", role)}
 			}
 		}
 	}
-	
 
 	sortedDisplayKeys := slices.Sorted(maps.Keys(display))
 
