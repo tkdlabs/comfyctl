@@ -12,6 +12,7 @@ Usage:
 
 Commands:
   dump		dumps details about the workflow (prompts, image sources, resolution, seed)
+  mark		manually maps a workflow input to a role (persisted in _meta.comfyctl)
   set		changes details about the workflow
   submit	submits the workflow to ComfyUI`
 
