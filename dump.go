@@ -11,7 +11,7 @@ import (
 // TODO: rework
 const dumpUsage = `comfyctl dump <what> - tries to find workflow crucial data that can be overridden
 
-Note: this uses best-effort finding algorithm (TODO: markers)
+Note: this uses best-effort search; roles marked with 'mark' take precedence.
 If no <what> is provided, tool outputs all attributes after trying.
 
 The following <What> attributes are supported. You can supply multiple <what>:

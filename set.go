@@ -15,7 +15,7 @@ Note: this uses the same mechanism as 'dump' to find attribute location.
 
 The following <what> attributes are supported:
   positive:	string: positive prompt
-  negative:	string: negative promt
+  negative:	string: negative prompt
   width:	int: width
   height:	int: height
   fps:		int: fps

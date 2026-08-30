@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const markUsage = `comfyctl mark [-i workfow] [role] [optional ref] - marks specific workflow input with designated role.
+const markUsage = `comfyctl mark [-i workflow] [role] [optional ref] - marks specific workflow input with designated role.
 
 This command is usually interactive, and can edit workflow files in-place
 as opposed to other commands. It should not be chained typically, although
@@ -26,6 +26,8 @@ Flags:
   -i workflow.json	The workflow in API format to be marked. If specified this way,
                         will be edited in-line
 			If not provided, tool expects workflow on stdin and will output via stdout.
+  -f, --overwrite	Allow replacing a role that is already marked on the target node,
+                        or moving a role that is marked on another node.
   [role]                Allows to specify any predefined roles, but also custom roles (any other string)
                         If you persist custom role mapping you'll be able to set it via "set" command
   [optional ref]	If provided, will skip interactive mode, and instead automatically use the input
@@ -36,19 +38,40 @@ type markOpts struct {
 	workflowPath string
 	role         string
 	ref          InputRef
+	overwrite    bool
+}
+
+func parseMarkArgs(args []string) (markOpts, []string, error) {
+	var opts markOpts
+	var rest []string
+	for i := 0; i < len(args); i++ {
+		switch arg := args[i]; arg {
+		case "-i":
+			if i+1 >= len(args) {
+				return opts, rest, fmt.Errorf("flag -i requires a workflow file argument")
+			}
+			opts.workflowPath = args[i+1]
+			i++
+		case "-f", "--overwrite":
+			opts.overwrite = true
+		case "-h", "--help":
+			fmt.Fprintln(os.Stderr, markUsage)
+			return opts, rest, flag.ErrHelp
+		default:
+			rest = append(rest, arg)
+		}
+	}
+	return opts, rest, nil
 }
 
 func cmdMark(args []string) error {
-	var opts markOpts
-	fs := flag.NewFlagSet("mark", flag.ContinueOnError)
-	fs.StringVar(&opts.workflowPath, "i", "", "Workflow file to be marked in-place")
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return nil
-		}
+	opts, rest, err := parseMarkArgs(args)
+	if err == flag.ErrHelp {
+		return nil // usage already printed
+	}
+	if err != nil {
 		return err
 	}
-	rest := fs.Args()
 	if len(rest) == 0 {
 		return fmt.Errorf("[role] is required\n\n%s", markUsage)
 	}
@@ -59,6 +82,9 @@ func cmdMark(args []string) error {
 			return fmt.Errorf("Invalid [ref] format: %v", err)
 		}
 		opts.ref = inpRef
+	}
+	if len(rest) > 2 {
+		return fmt.Errorf("Too many arguments: %v\n\n%s", rest, markUsage)
 	}
 
 	var isStdin = false
@@ -78,22 +104,10 @@ func cmdMark(args []string) error {
 	if err != nil {
 		return fmt.Errorf("Error opening workflow file: %v", err)
 	}
-	existingNode, err := cw.FindRole(opts.role)
-	if err != nil {
-		return fmt.Errorf("Internal error while finding existing marker of '%s' role: %v", opts.role, err)
-	}
-	if existingNode != "" {
-		fmt.Fprintf(os.Stderr, "Warning, workflow has already marked '%s' role on '%s' node.\n", opts.role, existingNode)
-		fmt.Fprintf(os.Stderr, "If this command writes, it will replace that marker\n")
-	}
 
-	marked := false
+	var target InputRef
 	if opts.ref.nodeId != "" && opts.ref.inputId != "" {
-		err := cw.MarkRole(opts.ref, opts.role)
-		if err != nil {
-			return fmt.Errorf("Error marking role %v: %v", opts.ref, err)
-		}
-		marked = true
+		target = opts.ref
 	} else {
 		var mapToRef map[int]InputRef = make(map[int]InputRef)
 		for i, input := range FindAllNonRefInputs(cw) {
@@ -102,7 +116,12 @@ func cmdMark(args []string) error {
 				return fmt.Errorf("Error resolving %v: %v", input, err)
 			}
 			mapToRef[i+1] = input
-			fmt.Fprintf(os.Stderr, "%d: {class:%s} [%s:%s]  %v\n", i+1, cw.resolveClass(input.nodeId), input.nodeId, input.inputId, val)
+			marker := cw.Nodes[input.nodeId].MarkerRole
+			if marker != "" {
+				fmt.Fprintf(os.Stderr, "%d: {class:%s} [%s:%s]  %v  (already marked as '%s')\n", i+1, cw.resolveClass(input.nodeId), input.nodeId, input.inputId, val, marker)
+			} else {
+				fmt.Fprintf(os.Stderr, "%d: {class:%s} [%s:%s]  %v\n", i+1, cw.resolveClass(input.nodeId), input.nodeId, input.inputId, val)
+			}
 		}
 		if isStdin {
 			return fmt.Errorf("You are piping input file to stdin. Interactive mode is not going to work.\n"+
@@ -120,27 +139,47 @@ func cmdMark(args []string) error {
 			input := strings.TrimSpace(scanner.Text())
 			number, err := strconv.ParseInt(input, 10, 64)
 			if err == nil && number >= 1 && number <= int64(len(mapToRef)) {
-				n := int(number)
-				fmt.Fprintf(os.Stderr, "Applying %s role to %s:%s ref\n", opts.role, mapToRef[n].nodeId,
-					mapToRef[n].inputId)
-				err := cw.MarkRole(mapToRef[n], opts.role)
-				if err != nil {
-					return fmt.Errorf("Error marking role: %v", err)
-				}
-				marked = true
+				target = mapToRef[int(number)]
 				break
 			} else {
 				fmt.Fprintf(os.Stderr, "Try again, only enter number between %d and %d\n", 1, len(mapToRef))
 			}
 		}
 	}
-
-	if !marked {
-		fmt.Fprintln(os.Stderr, "No role marked; leaving workflow unchanged.")
-		return nil
+	if target.nodeId == "" || target.inputId == "" {
+		return fmt.Errorf("No input selected; leaving workflow unchanged.")
 	}
 
-	// Write out
+	// Overwrite protection: a node holds exactly one marker (`_meta.comfyctl`
+	// is a single object), and a role should live in exactly one place. Refuse
+	// to clobber either unless -f is given; with -f, move the role cleanly.
+	existingNode, err := cw.FindRole(opts.role)
+	if err != nil {
+		return fmt.Errorf("Internal error while finding existing marker of '%s' role: %v", opts.role, err)
+	}
+	if existingNode != "" && existingNode != target.nodeId {
+		if !opts.overwrite {
+			return fmt.Errorf("Role '%s' is already marked on node %s. Use -f to move it to %s:%s.",
+				opts.role, existingNode, target.nodeId, target.inputId)
+		}
+		if err := cw.ClearMark(existingNode); err != nil {
+			return fmt.Errorf("Error clearing existing marker on node %s: %v", existingNode, err)
+		}
+		fmt.Fprintf(os.Stderr, "Moved '%s' marker from node %s to %s:%s\n",
+			opts.role, existingNode, target.nodeId, target.inputId)
+	} else if targetMarker := cw.Nodes[target.nodeId].MarkerRole; targetMarker != "" && targetMarker != opts.role {
+		if !opts.overwrite {
+			return fmt.Errorf("Node %s already carries the '%s' marker. Use -f to replace it with '%s'.",
+				target.nodeId, targetMarker, opts.role)
+		}
+		fmt.Fprintf(os.Stderr, "Replacing '%s' marker on node %s with '%s'\n",
+			targetMarker, target.nodeId, opts.role)
+	}
+
+	fmt.Fprintf(os.Stderr, "Applying %s role to %s:%s ref\n", opts.role, target.nodeId, target.inputId)
+	if err := cw.MarkRole(target, opts.role); err != nil {
+		return fmt.Errorf("Error marking role: %v", err)
+	}
 	var writer io.Writer
 	if opts.workflowPath == "" {
 		writer = os.Stdout

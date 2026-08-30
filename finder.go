@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"sort"
 	"strings"
 )
 
@@ -27,7 +28,7 @@ func findByRole(cw ComfyWorkflow, role string) ([]InputRef, error) {
 	case "batch":
 		return one(FindBatchSize(cw))
 	default:
-		return nil, fmt.Errorf("unkown role: %s", role)
+		return nil, fmt.Errorf("unknown role: %s", role)
 	}
 }
 
@@ -120,7 +121,9 @@ func FindSeed(workflow ComfyWorkflow) ([]InputRef, error) {
 	}
 	if len(refsfound) == 0 {
 		return refsfound, errors.New("Unable to find seed in the workflow")
-	} else if len(refsfound) > 1 {
+	}
+	sort.Slice(refsfound, func(i, j int) bool { return refsfound[i].nodeId < refsfound[j].nodeId })
+	if len(refsfound) > 1 {
 		log.Printf("Note: Found %d potential seed locations: [%v]", len(refsfound), refsfound)
 	}
 	return refsfound, nil
@@ -169,7 +172,7 @@ func any_found(inputs map[string]ComfyNodeInput, keys ...string) bool {
 
 func FindNegativePrompt(workflow ComfyWorkflow) (InputRef, error) {
 
-	// Fuzzy search for node that has "Positive Prompt" in title
+	// Fuzzy search for node that has "Negative Prompt" in title
 	for k, node := range workflow.Nodes {
 		if strings.Contains(node.Title, "Negative Prompt") {
 			nodeInput, found := node.Inputs["text"]
@@ -183,7 +186,7 @@ func FindNegativePrompt(workflow ComfyWorkflow) (InputRef, error) {
 		}
 	}
 
-	// Look for inputs "positive" and walk back to "text"
+	// Look for inputs "negative" and walk back to "text"
 	for k, node := range workflow.Nodes {
 		_, found := node.Inputs["negative"]
 		if !found {

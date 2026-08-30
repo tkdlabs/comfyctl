@@ -14,7 +14,7 @@ type ComfyFormat int
 const (
 	Unknown ComfyFormat = iota
 	API
-	GUI // GUI is unsuitable to seding over /prompt endpoint
+	GUI // GUI is unsuitable for sending over /prompt endpoint
 )
 
 type ComfyWorkflow struct {

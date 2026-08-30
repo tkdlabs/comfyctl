@@ -39,7 +39,7 @@ func main() {
 		fmt.Println(usage)
 		return
 	default:
-		fmt.Printf("unkown command %q\n\n%s\n", cmd, usage)
+		fmt.Printf("unknown command %q\n\n%s\n", cmd, usage)
 	}
 
 	if err != nil {

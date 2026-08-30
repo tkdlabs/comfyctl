@@ -291,6 +291,139 @@ func TestSetSeedRandom(t *testing.T) {
 	}
 }
 
+// copyWorkflowToTemp copies a workflow file into a fresh temp dir and returns
+// the copy's path, so mark-style in-place mutations never touch testdata.
+func copyWorkflowToTemp(t *testing.T, srcPath string) string {
+	t.Helper()
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		t.Fatalf("read src %s: %v", srcPath, err)
+	}
+	dst := filepath.Join(t.TempDir(), "marked.json")
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatalf("write temp %s: %v", dst, err)
+	}
+	return dst
+}
+
+// markFile drives the real cmdMark against a workflow file in place,
+// returning its error (nil on success).
+func markFile(t *testing.T, file string, args ...string) error {
+	t.Helper()
+	markArgs := append([]string{"-i", file}, args...)
+	return cmdMark(markArgs)
+}
+
+// markedRole reopens a workflow file and returns the marker role carried by
+// a node, or "" if it has none.
+func markedRole(t *testing.T, file, nodeID string) string {
+	t.Helper()
+	cw, err := openFile(t, file)
+	if err != nil {
+		t.Fatalf("reopen %s: %v", file, err)
+	}
+	return cw.Nodes[nodeID].MarkerRole
+}
+
+// TestFindSeedOrder guards the stable-output fix: FindSeed must return refs
+// sorted by node id, so `dump seed` output doesn't flicker run-to-run.
+func TestFindSeedOrder(t *testing.T) {
+	for _, path := range testdataFiles(t) {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			cw, err := openFile(t, path)
+			if err != nil {
+				t.Skipf("parse failed: %v", err)
+			}
+			refs, err := FindSeed(cw)
+			if err != nil || len(refs) < 2 {
+				return // not a multi-seed workflow
+			}
+			for i := 1; i < len(refs); i++ {
+				if refs[i-1].nodeId > refs[i].nodeId {
+					t.Errorf("seed refs out of order: %v -> %v", refs[i-1].nodeId, refs[i].nodeId)
+				}
+			}
+		})
+	}
+}
+
+// TestMarkOverwriteProtection guards the mark clobber guard: a node holds one
+// marker and a role lives in one place, so re-marking must refuse unless -f
+// is given, and -f must move the role cleanly.
+func TestMarkOverwriteProtection(t *testing.T) {
+	path := testdataFiles(t)[0]
+	cw, err := openFile(t, path)
+	if err != nil {
+		t.Skipf("parse failed: %v", err)
+	}
+	all := FindAllNonRefInputs(cw)
+	var a, b InputRef
+	for _, r := range all {
+		switch {
+		case a.nodeId == "":
+			a = r
+		case r.nodeId != a.nodeId:
+			b = r
+		}
+		if b.nodeId != "" {
+			break
+		}
+	}
+	if b.nodeId == "" {
+		t.Fatal("need markable inputs on at least two different nodes")
+	}
+	aRef, bRef := a.nodeId+":"+a.inputId, b.nodeId+":"+b.inputId
+
+	dst := copyWorkflowToTemp(t, path)
+
+	// First mark succeeds and lands on node a.
+	if err := markFile(t, dst, "myrole", aRef); err != nil {
+		t.Fatalf("first mark: %v", err)
+	}
+	if got := markedRole(t, dst, a.nodeId); got != "myrole" {
+		t.Fatalf("node %s marked as %q, want myrole", a.nodeId, got)
+	}
+
+	// Re-marking the same role on another node refuses without -f ...
+	if err := markFile(t, dst, "myrole", bRef); err == nil {
+		t.Fatal("expected error re-marking 'myrole' on another node without -f")
+	}
+	if got := markedRole(t, dst, b.nodeId); got != "" {
+		t.Errorf("node %s got marker %q despite refusal", b.nodeId, got)
+	}
+	if got := markedRole(t, dst, a.nodeId); got != "myrole" {
+		t.Errorf("node %s lost marker %q on refused move", a.nodeId, got)
+	}
+
+	// ... and with -f moves it: old node cleared, new node marked.
+	if err := markFile(t, dst, "-f", "myrole", bRef); err != nil {
+		t.Fatalf("move with -f: %v", err)
+	}
+	if got := markedRole(t, dst, a.nodeId); got != "" {
+		t.Errorf("node %s still marked %q after move", a.nodeId, got)
+	}
+	if got := markedRole(t, dst, b.nodeId); got != "myrole" {
+		t.Errorf("node %s marked as %q after move, want myrole", b.nodeId, got)
+	}
+
+	// Clobbering a node that already carries a different marker refuses ...
+	if err := markFile(t, dst, "other", bRef); err == nil {
+		t.Fatal("expected error replacing 'myrole' on node b with 'other' without -f")
+	}
+	if got := markedRole(t, dst, b.nodeId); got != "myrole" {
+		t.Errorf("node %s marker %q was clobbered without -f", b.nodeId, got)
+	}
+
+	// ... and with -f replaces it.
+	if err := markFile(t, dst, "-f", "other", bRef); err != nil {
+		t.Fatalf("replace with -f: %v", err)
+	}
+	if got := markedRole(t, dst, b.nodeId); got != "other" {
+		t.Errorf("node %s marked as %q after replace, want other", b.nodeId, got)
+	}
+}
+
 func truncate(v any) string {
 	s := fmt.Sprintf("%v", v)
 	s = strings.ReplaceAll(s, "\n", " ")
