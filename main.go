@@ -18,7 +18,8 @@ Commands:
   roles		lists every marked role and the nodes carrying it
   set		changes details about the workflow
   submit	submits the workflow to ComfyUI
-  version	prints comfyctl version/build metadata`
+  version	prints comfyctl version/build metadata
+`
 
 // Build metadata injected at release time via goreleaser -ldflags (-X).
 var (
@@ -55,7 +56,7 @@ func main() {
 		fmt.Println(versionString())
 		return
 	case "-h", "--help", "help":
-		fmt.Println(usage)
+		fmt.Print(usage)
 		return
 	default:
 		fmt.Printf("unknown command %q\n\n%s\n", cmd, usage)
