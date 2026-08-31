@@ -153,8 +153,16 @@ Changes needed (once the `mark` write path exists):
      on the old node first, so the role doesn't end up marked in two places.
      (`cmdMark` currently never calls `ClearMark` — this is the missing call.)
    - Longer-term alternative to the per-node ceiling: make `_meta.comfyctl` a
-     list of markers instead of a single object, so one node can carry several
-     roles. Decide before the format is relied on downstream.
+      list of markers instead of a single object, so one node can carry several
+      roles. Decide before the format is relied on downstream.
+   - **DONE — deletion & reconcile (issue #5).** `mark -d <role>` clears the
+      marker everywhere it lives (back to fuzzy), via `ComfyWorkflow.DeleteRole`
+      over `markerLocations()`. `DetectMarkerConflicts()` scans the whole file
+      for a role marked on multiple nodes or a marker pointing at a missing
+      input; `dump` prints those as notes. Deleting duplicates is still an
+      explicit, unambiguous `mark -d` — no auto-fix that could guess wrong.
+      Follow-up: surface conflicts in a dedicated `roles` command (issue #1)
+      rather than only in `dump` output.
 
 ### Design stance
 Keep roles **schema-less and per-file**: the workflow's `_meta.comfyctl` markers

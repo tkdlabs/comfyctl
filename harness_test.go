@@ -424,6 +424,142 @@ func TestMarkOverwriteProtection(t *testing.T) {
 	}
 }
 
+// TestMarkDelete guards `mark -d <role>`: after marking, deleting the role
+// removes its marker from every node carrying it, returning them to heuristic
+// resolution, and the workflow still parses back cleanly.
+func TestMarkDelete(t *testing.T) {
+	path := testdataFiles(t)[0]
+	cw, err := openFile(t, path)
+	if err != nil {
+		t.Skipf("parse failed: %v", err)
+	}
+	all := FindAllNonRefInputs(cw)
+	if len(all) == 0 {
+		t.Fatal("no markable inputs")
+	}
+	a := all[0]
+	aRef := a.nodeId + ":" + a.inputId
+
+	dst := copyWorkflowToTemp(t, path)
+
+	if err := markFile(t, dst, "myrole", aRef); err != nil {
+		t.Fatalf("mark: %v", err)
+	}
+	if got := markedRole(t, dst, a.nodeId); got != "myrole" {
+		t.Fatalf("node %s marked as %q, want myrole", a.nodeId, got)
+	}
+
+	// Delete the role; its marker should be gone and the file should reparse.
+	if err := markFile(t, dst, "-d", "myrole"); err != nil {
+		t.Fatalf("mark -d: %v", err)
+	}
+	if got := markedRole(t, dst, a.nodeId); got != "" {
+		t.Errorf("node %s still marked %q after mark -d", a.nodeId, got)
+	}
+
+	// Deleting a role that isn't marked is a no-op success, not an error.
+	if err := markFile(t, dst, "-d", "nope"); err != nil {
+		t.Errorf("mark -d on unmarked role should not error: %v", err)
+	}
+}
+
+// TestMarkDeleteFlagValidation guards the `-d` argument contract: it takes
+// exactly one role and no ref, and must error otherwise.
+func TestMarkDeleteFlagValidation(t *testing.T) {
+	path := testdataFiles(t)[0]
+	dst := copyWorkflowToTemp(t, path)
+
+	if err := markFile(t, dst, "-d"); err == nil {
+		t.Error("expected error: mark -d with no role")
+	}
+	if err := markFile(t, dst, "-d", "a", "b"); err == nil {
+		t.Error("expected error: mark -d with too many args")
+	}
+	// real role + ref combination must be rejected because -d takes no ref.
+	if err := markFile(t, dst, "-d", "role", "1:x"); err == nil {
+		t.Error("expected error: mark -d with a ref")
+	}
+}
+
+// TestDetectMarkerConflicts covers the reconcile half of #5: a role marked on
+// two nodes is detected, and `mark -d` resolves it.
+func TestDetectMarkerConflicts(t *testing.T) {
+	path := testdataFiles(t)[0]
+	cw, err := openFile(t, path)
+	if err != nil {
+		t.Skipf("parse failed: %v", err)
+	}
+	all := FindAllNonRefInputs(cw)
+	var a, b InputRef
+	for _, r := range all {
+		switch {
+		case a.nodeId == "":
+			a = r
+		case r.nodeId != a.nodeId:
+			b = r
+		}
+		if b.nodeId != "" {
+			break
+		}
+	}
+	if b.nodeId == "" {
+		t.Fatal("need markable inputs on two different nodes")
+	}
+	aRef, bRef := a.nodeId+":"+a.inputId, b.nodeId+":"+b.inputId
+
+	dst := copyWorkflowToTemp(t, path)
+	markFile(t, dst, "dup", aRef)
+	markFile(t, dst, "-f", "dup", bRef) // force-move so b carries it
+
+	// Simulate a file with the role marked on both nodes (hand-edited / merge):
+	// reopen, add the marker back to node a, write out.
+	cw2, err := openFile(t, dst)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	if err := cw2.MarkRole(a, "dup"); err != nil {
+		t.Fatalf("force duplicate mark: %v", err)
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		t.Fatalf("create %s: %v", dst, err)
+	}
+	if err := cw2.WriteOut(out); err != nil {
+		out.Close()
+		t.Fatalf("write: %v", err)
+	}
+	out.Close()
+
+	cw3, err := openFile(t, dst)
+	if err != nil {
+		t.Fatalf("reopen for detect: %v", err)
+	}
+	conflicts, err := cw3.DetectMarkerConflicts()
+	if err != nil {
+		t.Fatalf("DetectMarkerConflicts: %v", err)
+	}
+	var found bool
+	for _, c := range conflicts {
+		if c.Role == "dup" && len(c.Nodes) >= 2 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected duplicate role 'dup' conflict, got %+v", conflicts)
+	}
+
+	// mark -d on the duplicated role clears both markers.
+	if err := markFile(t, dst, "-d", "dup"); err != nil {
+		t.Fatalf("mark -d dup: %v", err)
+	}
+	if got := markedRole(t, dst, a.nodeId); got != "" {
+		t.Errorf("node %s still marked %q after -d", a.nodeId, got)
+	}
+	if got := markedRole(t, dst, b.nodeId); got != "" {
+		t.Errorf("node %s still marked %q after -d", b.nodeId, got)
+	}
+}
+
 func truncate(v any) string {
 	s := fmt.Sprintf("%v", v)
 	s = strings.ReplaceAll(s, "\n", " ")

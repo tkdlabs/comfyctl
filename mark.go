@@ -26,6 +26,8 @@ Flags:
   -i workflow.json	The workflow in API format to be marked. If specified this way,
                         will be edited in-line
 			If not provided, tool expects workflow on stdin and will output via stdout.
+  -d, --delete role	Delete the marker for the given role everywhere it is marked,
+                        returning those nodes to heuristic (fuzzy) resolution.
   -f, --overwrite	Allow replacing a role that is already marked on the target node,
                         or moving a role that is marked on another node.
   [role]                Allows to specify any predefined roles, but also custom roles (any other string)
@@ -39,6 +41,7 @@ type markOpts struct {
 	role         string
 	ref          InputRef
 	overwrite    bool
+	delete       bool
 }
 
 func parseMarkArgs(args []string) (markOpts, []string, error) {
@@ -54,6 +57,8 @@ func parseMarkArgs(args []string) (markOpts, []string, error) {
 			i++
 		case "-f", "--overwrite":
 			opts.overwrite = true
+		case "-d", "--delete":
+			opts.delete = true
 		case "-h", "--help":
 			fmt.Fprintln(os.Stderr, markUsage)
 			return opts, rest, flag.ErrHelp
@@ -86,6 +91,14 @@ func cmdMark(args []string) error {
 	if len(rest) > 2 {
 		return fmt.Errorf("Too many arguments: %v\n\n%s", rest, markUsage)
 	}
+	if opts.delete {
+		if len(rest) != 1 {
+			return fmt.Errorf("-d/--delete requires exactly one [role] argument\n\n%s", markUsage)
+		}
+		if opts.ref.nodeId != "" || opts.ref.inputId != "" {
+			return fmt.Errorf("-d/--delete does not take a [ref]; it deletes the role wherever it is marked")
+		}
+	}
 
 	var isStdin = false
 	var reader io.Reader
@@ -103,6 +116,13 @@ func cmdMark(args []string) error {
 	cw, err := OpenComfyWorkflow(reader)
 	if err != nil {
 		return fmt.Errorf("Error opening workflow file: %v", err)
+	}
+
+	if opts.delete {
+		if err := runMarkDelete(&cw, opts); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	var target InputRef
@@ -180,19 +200,40 @@ func cmdMark(args []string) error {
 	if err := cw.MarkRole(target, opts.role); err != nil {
 		return fmt.Errorf("Error marking role: %v", err)
 	}
+	return writeWorkflow(&cw, opts.workflowPath)
+}
+
+// runMarkDelete implements `mark -d/--delete <role>`: it removes the marker
+// from every node carrying that role (returning them to heuristic resolution)
+// and writes the workflow out. It never prompts and needs no ref.
+func runMarkDelete(cw *ComfyWorkflow, opts markOpts) error {
+	removed, err := cw.DeleteRole(opts.role)
+	if err != nil {
+		return fmt.Errorf("Error deleting marker(s) for role '%s': %v", opts.role, err)
+	}
+	if removed == 0 {
+		fmt.Fprintf(os.Stderr, "Role '%s' was not marked; workflow unchanged.\n", opts.role)
+	} else {
+		fmt.Fprintf(os.Stderr, "Deleted %d marker(s) for role '%s'\n", removed, opts.role)
+	}
+	return writeWorkflow(cw, opts.workflowPath)
+}
+
+// writeWorkflow writes a workflow to stdout (filter style) or to the given
+// workflowPath in place, matching the read source.
+func writeWorkflow(cw *ComfyWorkflow, workflowPath string) error {
 	var writer io.Writer
-	if opts.workflowPath == "" {
+	if workflowPath == "" {
 		writer = os.Stdout
 	} else {
-		file, err := os.Create(opts.workflowPath)
+		file, err := os.Create(workflowPath)
 		if err != nil {
-			return fmt.Errorf("Unable to open workflow file for writing: %s: %v", opts.workflowPath, err)
+			return fmt.Errorf("Unable to open workflow file for writing: %s: %v", workflowPath, err)
 		}
 		defer file.Close()
 		writer = file
 	}
-	err = cw.WriteOut(writer)
-	if err != nil {
+	if err := cw.WriteOut(writer); err != nil {
 		return fmt.Errorf("I/O error writing out json workflow: %v", err)
 	}
 	return nil

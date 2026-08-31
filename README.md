@@ -71,10 +71,18 @@ you to pick one. Provide a `node:input` ref to skip the prompt:
 comfyctl mark positive 116:42:value        # mark a specific input
 comfyctl mark character_image 3:LoadImage  # custom role
 comfyctl mark positive -i workflow.json    # edit a file in place
+comfyctl mark -d character_image -i wf.json  # delete a marker, back to fuzzy
 ```
 
 `mark` is the only command that can edit files in place; otherwise it reads
 stdin and writes stdout like the rest.
+
+Deleting a marker with `mark -d <role>` returns that node to heuristic
+(fuzzy) resolution. Because a role should live in exactly one place, `mark`
+refuses to re-mark a role already pinned elsewhere (or to put a second marker
+on a node) unless you pass `-f` to move it. `dump` surfaces any stray
+violation — a role marked on multiple nodes, or a marker pointing at a missing
+input — as a note, and `mark -d` is the way to clear them before re-marking.
 
 ### submit
 

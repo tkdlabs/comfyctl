@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 )
 
 // TODO: rework
@@ -64,6 +65,7 @@ func cmdDump(args []string) error {
 				display[role] = roleDescriptor{fmt.Sprintf("custom role marker '%s'", role)}
 			}
 		}
+		printMarkerConflicts(cw)
 	}
 
 	sortedDisplayKeys := slices.Sorted(maps.Keys(display))
@@ -84,4 +86,25 @@ func cmdDump(args []string) error {
 		}
 	}
 	return nil
+}
+
+// printMarkerConflicts reports marker uniqueness violations to stderr (notes,
+// not data): a role marked on more than one node, and markers pointing at a
+// missing input. Fixing them is an explicit `mark -d <role>` or `mark -f move`.
+func printMarkerConflicts(cw ComfyWorkflow) {
+	conflicts, err := cw.DetectMarkerConflicts()
+	if err != nil {
+		fmt.Printf("Error while checking marker conflicts: %v\n", err)
+		return
+	}
+	for _, c := range conflicts {
+		if len(c.Nodes) > 1 {
+			fmt.Printf("Note: role '%s' is marked on %d nodes (%s); use 'mark -d %s' then re-mark, or 'mark -f' to move.\n",
+				c.Role, len(c.Nodes), strings.Join(c.Nodes, ", "), c.Role)
+		}
+		if c.Dangling != "" {
+			fmt.Printf("Note: marker for role '%s' on node %s points at a missing input; use 'mark -d %s' to clear it.\n",
+				c.Role, c.Dangling, c.Role)
+		}
+	}
 }

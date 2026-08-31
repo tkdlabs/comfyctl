@@ -147,6 +147,88 @@ func (cw ComfyWorkflow) FindAllMarkedRoles() ([]string, error) {
 	return res, nil
 }
 
+// markerRole is a (role, nodeID) pair for the nodes that carry a marker.
+type markerRole struct {
+	role   string
+	nodeId string
+}
+
+// markerLocations returns every marked node, sorted by role then node id.
+// It is the single source of truth for "which node carries a role", used by
+// mark -d (delete) and by DetectMarkerConflicts (duplicate detection).
+func (cw ComfyWorkflow) markerLocations() []markerRole {
+	var res []markerRole
+	for id, node := range cw.Nodes {
+		if node.MarkerRole != "" {
+			res = append(res, markerRole{role: node.MarkerRole, nodeId: id})
+		}
+	}
+	sort.Slice(res, func(i, j int) bool {
+		if res[i].role != res[j].role {
+			return res[i].role < res[j].role
+		}
+		return res[i].nodeId < res[j].nodeId
+	})
+	return res
+}
+
+// MarkerConflict is a single uniqueness violation found by
+// DetectMarkerConflicts.
+type MarkerConflict struct {
+	Role     string
+	Nodes    []string // sorted, len > 1 when a role is marked in multiple places
+	Dangling string   // node whose marker points at a missing role/input
+}
+
+// DetectMarkerConflicts scans the whole file for marker uniqueness problems:
+// a role marked on more than one node, and markers whose target input no
+// longer exists. Fixing them is an explicit `mark -d <role>` (or -f move).
+func (cw ComfyWorkflow) DetectMarkerConflicts() ([]MarkerConflict, error) {
+	if !cw.NodesSynced {
+		return nil, fmt.Errorf("The parsed nodes are not synced to current version.")
+	}
+	byRole := make(map[string][]string)
+	var dangling []MarkerConflict
+	for id, node := range cw.Nodes {
+		if node.MarkerRole == "" {
+			continue
+		}
+		if node.MarkerInput != "" {
+			if _, ok := node.Inputs[node.MarkerInput]; !ok {
+				dangling = append(dangling, MarkerConflict{Role: node.MarkerRole, Dangling: id})
+				continue
+			}
+		}
+		byRole[node.MarkerRole] = append(byRole[node.MarkerRole], id)
+	}
+	var res []MarkerConflict
+	for role, nodes := range byRole {
+		if len(nodes) < 2 {
+			continue
+		}
+		sort.Strings(nodes)
+		res = append(res, MarkerConflict{Role: role, Nodes: nodes})
+	}
+	sort.Slice(res, func(i, j int) bool { return res[i].Role < res[j].Role })
+	return append(res, dangling...), nil
+}
+
+// DeleteRole clears the marker from every node that carries the given role,
+// returning the number of markers removed (0 if the role was not marked).
+func (cw *ComfyWorkflow) DeleteRole(role string) (int, error) {
+	var removed int
+	for _, m := range cw.markerLocations() {
+		if m.role != role {
+			continue
+		}
+		if err := cw.ClearMark(m.nodeId); err != nil {
+			return removed, err
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 // ClearMark removes the comfyctl marker (if any) from a node.
 func (cw *ComfyWorkflow) ClearMark(nodeId string) error {
 	nodeRawMap, err := cw.getRawNodeIdMap(nodeId)
