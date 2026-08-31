@@ -145,6 +145,17 @@ cat wf.json \
 comfyctl mark positive 116:42:value -i wf.json
 ```
 
+### version
+
+Prints the version and build metadata (injected at release time via
+goreleaser `-ldflags`). A locally built binary reports the `dev` defaults.
+
+```sh
+comfyctl version
+comfyctl --version
+# comfyctl v0.2.0 (commit: 1cd4376, built: 2026-08-30T10:00:00Z)
+```
+
 ## How roles work
 
 Roles are names for the attributes you care about. The built-in roles
@@ -162,6 +173,22 @@ global config. The workflow is self-describing: ComfyUI ignores the extra
 go build ./...
 go test ./...   # runs the testdata/ harness over sample workflows
 ```
+
+### Releases
+
+Releases are built with [goreleaser](https://goreleaser.com) and attached to
+GitHub releases by the `.github/workflows/release.yml` workflow, which runs
+when a `v*` tag is pushed:
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The pipeline builds `linux`/`darwin`/`windows` on `amd64`/`arm64`, injects
+version/commit/date via `-ldflags`, and uploads archives + checksums to the
+release. Validate the config locally with `goreleaser check` (or a snapshot
+build via `goreleaser release --snapshot --skip=publish --clean`).
 
 ## License
 

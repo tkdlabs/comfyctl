@@ -1,4 +1,7 @@
 /comfyctl
 
+# goreleaser build output
+/dist/
+
 # ComfyUI generation outputs
 *.png
