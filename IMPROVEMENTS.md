@@ -1,16 +1,19 @@
 # Improvements
 
 Findings from running the `testdata/` harness (`go test ./...`) over 26 vanilla
-ComfyUI API workflows. All 26 **parse** cleanly; every gap below is in the
-finder heuristics. Root cause is shared: the finders anchor on a fixed
-whitelist of input names, and newer templates rename inputs and insert routing
-nodes the crawl doesn't follow.
+ComfyUI API workflows. All 26 **parse** cleanly. The finder heuristics below
+describe the history of the largest gap class — a whitelist of input names and
+a hand-maintained follow list that could not keep up with new templates. That
+fragility is now resolved by the **inverted crawl** (see "Architectural note"
+and issue #4): finders walk *any* upstream ref, stop at the first input of the
+target type, bounded by depth, hints, and banned classes. Items 1–5 record the
+original whitelist-era findings and their fixes; the crawl rewrite is #6.
 
 ## Prioritized by blast radius
 
 ### 1. Seed finder misses `noise_seed` (18 / 26 files) — DONE (70cc020)
 `RandomNoise` (flux2, hunyuan, ltx2) and `KSamplerAdvanced` (wan2.2,
-key-frames) name the input `noise_seed`, not `seed`. `FindSeed` only anchors on
+key-frames) name the input `noise_seed`, not `seed`. `FindSeed` only anchored on
 `seed`, so seed detection silently fails on the majority of current workflows —
 only legacy `KSampler` and the bytedance API nodes still hit.
 - **Fix:** add `noise_seed` to both the anchor check and the crawl follow-list,
@@ -24,6 +27,10 @@ chain) still has exactly one semantic source upstream, so following it is safe
 and heuristic-correct. A fan-in node (Concatenate, multiple primitives) is where
 semantics genuinely branch — no reliable signal picks the right source, so
 guessing risks *silently* writing the wrong input. Resolve those by marker.
+The inverted crawl (issue #4) now follows routing nodes *by construction* (any
+ref, one bounded generic hop), so new routing nodes stop needing hand-chasing —
+and the fan-in merge classes (`StringConcatenate*`) are banned wholesale, so
+the "mark through merges" half of the boundary survives.
 
 - **LTX2 t2v/i2v/ia2v — positive lost. DONE.** Chain was
   `CFGGuider.positive -> LTXVConditioning -> CLIPTextEncode.text -> ComfySwitchNode`
@@ -31,17 +38,20 @@ guessing risks *silently* writing the wrong input. Resolve those by marker.
   stopped at the Switch. Fixed by adding `on_true`/`on_false` to the positive
   crawl — a pure routing pass-through, exactly the safe case. All three LTX2
   workflows now resolve `positive`.
-- **krea2 t2i — positive not found; resolve via markers, do NOT crawl. DONE.**
-  `CLIPTextEncode.text -> StringConcatenate` (`string_a`/`string_b`) merges two
-  `PrimitiveStringMultiline` nodes (system prompt + user prompt), with a
-  `TextGenerate` LLM node in the mix. This is a fan-in: nothing reliably says
-  which side is the user's prompt, and a heuristic that guesses could overwrite
-  the *system* prompt on `set positive` — silent corruption, worse than a miss.
-  The crawl correctly dead-ends and returns not-found today. Intended fix is the
-  `mark` write path: mark the real prompt as `positive` (marker-first overrides
-  the failed heuristic, keeping `set positive` uniform across workflows) and the
-  system prompt as a custom `system` role. This is the text-side twin of the
-  "multiple `LoadImage` refs" case under Roles & markers.
+- **krea2 t2i — positive now resolves via the inverted crawl; system prompt is
+  safe. DONE (issue #4).**
+  `CLIPTextEncode.text -> ComfySwitchNode` fans into `StringConcatenate`
+  (`string_a`/`string_b`) merging a `PrimitiveStringMultiline` system prompt +
+  user prompt, with a `TextGenerate` LLM node in the mix. The naive "follow
+  everything" grabs the system prompt; the inverted crawl instead:
+  - bans `StringConcatenate`/`StringConcatenateMulti`, so the system prompt is
+    unreachable (no silent `set positive` corruption of it),
+  - resolves the user prompt through the switch arms to the raw
+    `PrimitiveStringMultiline` — `dump positive` and `set positive` now hit the
+    real user prompt with no marker required.
+  This supersedes the earlier stance ("resolve via markers, do NOT crawl") once
+  the crawl could prove it could not reach the system prompt. Markers remain the
+  correct tool for any *other* krea2-style ambiguity.
 
 ### 3. Titled-node branch bails on a node-ref and spams stderr — DONE (fe6f350)
 In `image_flux2_klein_text_to_image.json` the node titled
@@ -94,20 +104,20 @@ the read looked fine. Guarded by `TestSetSeedUpdatesAllNodes` (now enabled).
 
 ## Architectural note
 
-Items 1–4 are one fragility: a whitelist of input names can't keep up with new
+Items 1–4 were one fragility: a whitelist of input names can't keep up with new
 templates. Every generation adds routing nodes (Switch, Concatenate, primitive
 value nodes) that must be chased by hand.
 
-Invert the crawl: follow *any* upstream node-ref, stop at the first node whose
-input matches the target **type** and whose class isn't banned, bounded by
-depth. This survives new node types without edits. The real risk is
-**ambiguity** — krea2 has two `PrimitiveStringMultiline` nodes (system prompt +
-user prompt), so "follow everything" could grab the wrong one. Mitigate by
-ranking: prefer known classes (`CLIPTextEncode`, `Primitive*`) and keep the
-`bannedClasses` escape hatch for system-prompt / negative nodes.
-
-The whitelist patches (items 1, 4) are fine as a stopgap to get seeds working
-today; the inverted crawl is the version worth building.
+**DONE — inverted crawl (issue #4).** The finder crawl now walks *any* upstream
+node-ref and stops at the first node whose input matches the target **type**,
+bounded by `maxCrawlDepth`, a hint set per role, and the `bannedClasses` escape
+hatch. New routing nodes survive without edits (locked in by
+`inverted_crawl_test.go` with fabricated router classes). The ambiguity risk —
+krea2's two `PrimitiveStringMultiline` nodes (system + user prompt) — is handled
+by banning the fan-in merge classes so the system prompt is unreachable, and
+hint-ranking so crawling only follows refs that look like the role. The
+whitelist patches (items 1, 4) are historical; the inverted crawl is the
+version shipped.
 
 ## Roles & markers
 
@@ -134,8 +144,9 @@ Changes needed (once the `mark` write path exists):
 2. **Infer `set`'s type from the target input, not a role->type table.** The
    marker points at an input that already has a `ComfyNodeInputType`; branch on
    that. Kills the `isIntRole` string-matching for built-ins too, and is where
-   the dormant `crawlUntilFoundBool` / a `SetBool` finally earn their keep (a
-   custom role pointing at a bool toggle).
+   a `SetBool` finally earns its keep (a custom role pointing at a bool
+   toggle — the generic `crawlUntilFound` with `ComfyBoolInput` already serves
+   the crawl half).
 3. **Add a `roles` command** (`comfyctl roles < wf.json`) listing every marked
    role + node count. Discoverability guard against the one footgun: a typo in
    `mark` silently creates a phantom role. **DONE (issue #1)** — `roles` lists
@@ -190,4 +201,7 @@ it, so markers are safe to rely on end-to-end. Exercised on a live host:
 
 This also closes the krea2 case in #2: the marked prompt overrides the failed
 heuristic, `set positive` writes the right side of the fan-in, and the result
-submits cleanly.
+submits cleanly. (Since the inverted crawl lands, markers are no longer
+*required* for krea2 — `FindPositivePrompt` resolves the user prompt directly —
+but the round-trip still proves markers are harmless to ComfyUI and stay the
+correct override when a heuristic ever guesses wrong.)
