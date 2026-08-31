@@ -196,6 +196,14 @@ func cmdMark(args []string) error {
 			targetMarker, target.nodeId, opts.role)
 	}
 
+	// Discovery guard (issue #1): a misspelled custom role silently creates a
+	// phantom role disjoint from the one the user meant. Warn when the role is
+	// neither a built-in nor already marked anywhere in the file, so typos
+	// (charater_image vs character_image) surface instead of being stored.
+	if _, builtin := PredefinedRoles[opts.role]; !builtin && existingNode == "" {
+		fmt.Fprintf(os.Stderr, "Note: '%s' is not a built-in role and is new to this file; 'roles' lists marked roles to catch typos.\n", opts.role)
+	}
+
 	fmt.Fprintf(os.Stderr, "Applying %s role to %s:%s ref\n", opts.role, target.nodeId, target.inputId)
 	if err := cw.MarkRole(target, opts.role); err != nil {
 		return fmt.Errorf("Error marking role: %v", err)

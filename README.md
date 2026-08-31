@@ -84,6 +84,31 @@ on a node) unless you pass `-f` to move it. `dump` surfaces any stray
 violation — a role marked on multiple nodes, or a marker pointing at a missing
 input — as a note, and `mark -d` is the way to clear them before re-marking.
 
+When you mark a role that is neither built-in nor already used in the file,
+`mark` prints a warning — a guard against a typo (e.g. `charater_image`)
+silently creating a phantom role.
+
+### roles
+
+Lists every role marked via `mark`, with node counts, so you can see a
+workflow's marker registry at a glance (the file's `_meta.comfyctl` is the
+only source of truth — there is no global config).
+
+```sh
+cat workflow.json | comfyctl roles
+```
+
+Output, one role per line with its node id(s):
+
+```
+bg_audio        (1 node)       16
+character_image (1 node)       11
+```
+
+As with `dump`, any uniqueness violation — a role marked on multiple nodes or
+a marker pointing at a missing input — is printed as a `Note:` so you can fix
+it with `mark -d <role>` and re-mark.
+
 ### submit
 
 Posts a workflow to ComfyUI, waits for it to complete, and downloads the

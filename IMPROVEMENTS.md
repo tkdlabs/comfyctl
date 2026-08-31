@@ -138,8 +138,9 @@ Changes needed (once the `mark` write path exists):
    custom role pointing at a bool toggle).
 3. **Add a `roles` command** (`comfyctl roles < wf.json`) listing every marked
    role + node count. Discoverability guard against the one footgun: a typo in
-   `mark` silently creates a phantom role. Optionally warn in `mark` when a role
-   name is new to the file.
+   `mark` silently creates a phantom role. **DONE (issue #1)** — `roles` lists
+   marked roles with node counts and conflict notes; `mark` warns when a role
+   is new to the file.
 4. **Overwrite protection on `mark` (one marker per node).** The model stores a
    single `MarkerRole`/`MarkerInput` per `ComfyNode`, and `MarkRole` replaces the
    node's whole `_meta.comfyctl` submap — so marking a second input on a node
@@ -159,10 +160,16 @@ Changes needed (once the `mark` write path exists):
       marker everywhere it lives (back to fuzzy), via `ComfyWorkflow.DeleteRole`
       over `markerLocations()`. `DetectMarkerConflicts()` scans the whole file
       for a role marked on multiple nodes or a marker pointing at a missing
-      input; `dump` prints those as notes. Deleting duplicates is still an
-      explicit, unambiguous `mark -d` — no auto-fix that could guess wrong.
-      Follow-up: surface conflicts in a dedicated `roles` command (issue #1)
-      rather than only in `dump` output.
+      input; `dump` and `roles` print those as notes. Deleting duplicates is
+      still an explicit, unambiguous `mark -d` — no auto-fix that could guess
+      wrong.
+   - **DONE — `roles` command + typo guard (issue #1).** `comfyctl roles`
+      lists every marked role with its node count and conflict notes, reading
+      the markers back from the file (the only registry). `mark` now warns
+      when a role is neither built-in nor already present, catching
+      `charater_image`-style typos before they become phantom roles. The
+      remaining numbered item is #3 (infer `set`'s type from the target input
+      instead of the `isIntRole` table).
 
 ### Design stance
 Keep roles **schema-less and per-file**: the workflow's `_meta.comfyctl` markers

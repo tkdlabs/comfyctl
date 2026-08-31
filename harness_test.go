@@ -560,6 +560,99 @@ func TestDetectMarkerConflicts(t *testing.T) {
 	}
 }
 
+// TestRolesCommand guards issue #1's `roles` command: it lists every marked
+// role with its node count and surfaces a duplicated role as a note.
+func TestRolesCommand(t *testing.T) {
+	path := testdataFiles(t)[0]
+	cw, err := openFile(t, path)
+	if err != nil {
+		t.Skipf("parse failed: %v", err)
+	}
+	all := FindAllNonRefInputs(cw)
+	var a, b InputRef
+	for _, r := range all {
+		switch {
+		case a.nodeId == "":
+			a = r
+		case r.nodeId != a.nodeId:
+			b = r
+		}
+		if b.nodeId != "" {
+			break
+		}
+	}
+	if b.nodeId == "" {
+		t.Fatal("need markable inputs on two different nodes")
+	}
+
+	dst := copyWorkflowToTemp(t, path)
+	markFile(t, dst, "character_image", a.nodeId+":"+a.inputId)
+	markFile(t, dst, "bg_audio", b.nodeId+":"+b.inputId)
+
+	out := runRoles(t, dst)
+
+	for _, want := range []string{"character_image", "bg_audio", "(1 node)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("roles output missing %q:\n%s", want, out)
+		}
+	}
+
+	// A duplicated role surfaces as a "marked on 2 nodes" note: force the
+	// role onto the second node too (overwriting its bg_audio marker).
+	cw2, err := openFile(t, dst)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	if err := cw2.MarkRole(b, "character_image"); err != nil {
+		t.Fatalf("force duplicate: %v", err)
+	}
+	df, err := os.Create(dst)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := cw2.WriteOut(df); err != nil {
+		df.Close()
+		t.Fatalf("write: %v", err)
+	}
+	df.Close()
+
+	out2 := runRoles(t, dst)
+	if !strings.Contains(out2, "marked on 2 nodes") {
+		t.Errorf("roles output should flag the duplicate role:\n%s", out2)
+	}
+}
+
+// runRoles drives cmdRoles by swapping stdin to read from a file and
+// capturing stdout.
+func runRoles(t *testing.T, inputPath string) string {
+	t.Helper()
+	in, err := os.Open(inputPath)
+	if err != nil {
+		t.Fatalf("open input: %v", err)
+	}
+	defer in.Close()
+
+	out, err := os.CreateTemp(t.TempDir(), "roles-out-*.txt")
+	if err != nil {
+		t.Fatalf("temp out: %v", err)
+	}
+	defer out.Close()
+
+	oldIn, oldOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = in, out
+	err = cmdRoles(nil)
+	os.Stdin, os.Stdout = oldIn, oldOut
+	if err != nil {
+		t.Fatalf("cmdRoles: %v", err)
+	}
+
+	b, err := os.ReadFile(out.Name())
+	if err != nil {
+		t.Fatalf("read out: %v", err)
+	}
+	return string(b)
+}
+
 func truncate(v any) string {
 	s := fmt.Sprintf("%v", v)
 	s = strings.ReplaceAll(s, "\n", " ")

@@ -14,6 +14,7 @@ Commands:
   dump		dumps details about the workflow (prompts, image sources, resolution, seed)
   mark		manually maps a workflow input to a role (persisted in _meta.comfyctl);
 			mark -d <role> deletes a marker
+  roles		lists every marked role and the nodes carrying it
   set		changes details about the workflow
   submit	submits the workflow to ComfyUI`
 
@@ -32,6 +33,8 @@ func main() {
 		err = cmdDump(cmdArgs)
 	case "mark":
 		err = cmdMark(cmdArgs)
+	case "roles":
+		err = cmdRoles(cmdArgs)
 	case "set":
 		err = cmdSet(cmdArgs)
 	case "submit":
