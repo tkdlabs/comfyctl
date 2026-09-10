@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"testing"
 )
 
@@ -137,5 +139,81 @@ func TestMarkedWorkflowReparsesCleanly(t *testing.T) {
 	}
 	if gotStr, _ := val.(string); gotStr != "reparse-value" {
 		t.Errorf("node 33 model.prompt resolves to %q, want %q", val, "reparse-value")
+	}
+}
+
+// TestPromptEnvelopeWorkflow guards that a ComfyUI /prompt request body, where
+// the node map is nested under a top-level "prompt" key alongside metadata like
+// client_id, is unwrapped transparently: nodes parse, finders work, and
+// write-out re-wraps so the document round-trips with its envelope intact.
+func TestPromptEnvelopeWorkflow(t *testing.T) {
+	inner, err := os.ReadFile("testdata/api_wan2_7_i2v.json")
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+	wrapped := append(append([]byte(`{"prompt": `), inner...),
+		[]byte(`, "client_id": "abc-123"}`)...)
+
+	cw, err := OpenComfyWorkflow(bytes.NewReader(wrapped))
+	if err != nil {
+		t.Fatalf("wrapped workflow does not parse: %v", err)
+	}
+	if len(cw.Nodes) == 0 {
+		t.Fatal("no nodes parsed from prompt envelope")
+	}
+	if len(FindAllNonRefInputs(cw)) == 0 {
+		t.Fatal("no markable inputs found in wrapped workflow")
+	}
+	if _, err := FindImage(cw); err != nil {
+		t.Errorf("finder failed on wrapped workflow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := cw.WriteOut(&buf); err != nil {
+		t.Fatalf("write-out: %v", err)
+	}
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if _, ok := doc["prompt"]; !ok {
+		t.Error("write-out dropped the prompt envelope")
+	}
+	if string(doc["client_id"]) != `"abc-123"` {
+		t.Errorf("write-out did not preserve client_id, got %s", doc["client_id"])
+	}
+	if _, err := OpenComfyWorkflow(bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatalf("written workflow does not reparse: %v", err)
+	}
+}
+
+// TestFindAllNonRefInputsDeterministic guards that the interactive mark listing
+// is stable across calls: node ids and input names are sorted so option numbers
+// do not shuffle between runs.
+func TestFindAllNonRefInputsDeterministic(t *testing.T) {
+	cw, err := openFile(t, "testdata/api_wan2_7_i2v.json")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	first := FindAllNonRefInputs(cw)
+	for i := 0; i < 5; i++ {
+		again := FindAllNonRefInputs(cw)
+		if len(again) != len(first) {
+			t.Fatalf("length changed: %d vs %d", len(again), len(first))
+		}
+		for j := range first {
+			if first[j] != again[j] {
+				t.Fatalf("order changed at %d: %v vs %v", j, first[j], again[j])
+			}
+		}
+	}
+	for i := 1; i < len(first); i++ {
+		prev, cur := first[i-1], first[i]
+		if prev.nodeId > cur.nodeId {
+			t.Fatalf("nodes not sorted: %v before %v", prev, cur)
+		}
+		if prev.nodeId == cur.nodeId && prev.inputId > cur.inputId {
+			t.Fatalf("inputs not sorted: %v before %v", prev, cur)
+		}
 	}
 }

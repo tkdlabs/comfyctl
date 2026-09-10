@@ -21,6 +21,12 @@ type ComfyWorkflow struct {
 	Raw         map[string]any
 	Nodes       map[string]ComfyNode
 	NodesSynced bool
+	// envelope holds the original top-level document when the input was a
+	// ComfyUI /prompt request body ({"prompt": {<nodes>}, ...}) rather than a
+	// bare API workflow. Raw then points at the inner node map and WriteOut
+	// re-wraps, so the file round-trips unchanged apart from the edit itself.
+	envelope    map[string]any
+	envelopeKey string
 }
 
 func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
@@ -32,6 +38,12 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 	decoder.UseNumber()
 	if err := decoder.Decode(&result.Raw); err != nil {
 		return result, err
+	}
+
+	if inner, ok := unwrapPromptEnvelope(result.Raw); ok {
+		result.envelope = result.Raw
+		result.envelopeKey = "prompt"
+		result.Raw = inner
 	}
 
 	switch CheckFormat(result.Raw) {
@@ -46,6 +58,22 @@ func OpenComfyWorkflow(reader io.Reader) (ComfyWorkflow, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+// unwrapPromptEnvelope detects a ComfyUI /prompt request body, where the node
+// map is nested under a top-level "prompt" key alongside request metadata like
+// client_id. The nested value must itself look like an API workflow; that
+// disambiguates the envelope from an ordinary node whose id happens to be
+// "prompt" (whose value would be a node map, not a map of nodes).
+func unwrapPromptEnvelope(raw map[string]any) (map[string]any, bool) {
+	inner, err := extractMap(raw, "prompt")
+	if err != nil {
+		return nil, false
+	}
+	if CheckFormat(inner) != API {
+		return nil, false
+	}
+	return inner, true
 }
 
 func (c ComfyWorkflow) ResolveRole(role string) ([]InputRef, error) {
@@ -307,10 +335,15 @@ func (cw ComfyWorkflow) getRawInputMap(inputRef InputRef) (map[string]any, error
 }
 
 func (cw ComfyWorkflow) WriteOut(writer io.Writer) error {
+	out := cw.Raw
+	if cw.envelope != nil {
+		cw.envelope[cw.envelopeKey] = cw.Raw
+		out = cw.envelope
+	}
 	encoder := json.NewEncoder(writer)
 	// pretty printing
 	encoder.SetIndent("", "    ")
-	return encoder.Encode(cw.Raw)
+	return encoder.Encode(out)
 }
 
 // Node

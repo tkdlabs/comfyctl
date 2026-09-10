@@ -4,10 +4,11 @@ A command line tool for viewing, modifying, and submitting [ComfyUI](https://git
 API workflows from the shell.
 
 Comfyctl reads a workflow in ComfyUI's **API format** (the JSON produced by
-"Save (API Format)" in the web UI), lets you inspect and tweak the interesting
-bits — prompt, seed, resolution, batch size, input image — and submits it
-straight to a ComfyUI server, downloading the generated files when the run
-finishes.
+"Save (API Format)" in the web UI), or a `/prompt` request body that wraps the
+same node map under a top-level `"prompt"` key (the envelope is preserved on
+write-out). It lets you inspect and tweak the interesting bits — prompt, seed,
+resolution, batch size, input image — and submits it straight to a ComfyUI
+server, downloading the generated files when the run finishes.
 
 ## Install
 

@@ -216,8 +216,15 @@ func FindImage(workflow ComfyWorkflow) (InputRef, error) {
 
 func FindAllNonRefInputs(workflow ComfyWorkflow) []InputRef {
 	var res []InputRef
-	for k, node := range workflow.Nodes {
-		for ki, input := range node.Inputs {
+	for _, k := range sortedNodeIDs(workflow) {
+		node := workflow.Nodes[k]
+		names := make([]string, 0, len(node.Inputs))
+		for ki := range node.Inputs {
+			names = append(names, ki)
+		}
+		sort.Strings(names)
+		for _, ki := range names {
+			input := node.Inputs[ki]
 			if input.Type != UnknownNodeInputType && input.Type != ComfyNodeRef {
 				res = append(res, InputRef{k, ki, input.Type})
 			}
