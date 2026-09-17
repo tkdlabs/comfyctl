@@ -150,6 +150,16 @@ func (cw *ComfyWorkflow) SetInt(inputRef InputRef, value int64) error {
 	return nil
 }
 
+func (cw *ComfyWorkflow) SetBool(inputRef InputRef, value bool) error {
+	inputMap, err := cw.getRawInputMap(inputRef)
+	if err != nil {
+		return err
+	}
+	inputMap[inputRef.inputId] = value
+	cw.NodesSynced = false
+	return nil
+}
+
 func (cw ComfyWorkflow) FindRole(role string) (string, error) {
 	if !cw.NodesSynced {
 		return "", fmt.Errorf("The parsed nodes are not synced to current version.")
