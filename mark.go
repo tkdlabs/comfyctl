@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -228,21 +229,41 @@ func runMarkDelete(cw *ComfyWorkflow, opts markOpts) error {
 }
 
 // writeWorkflow writes a workflow to stdout (filter style) or to the given
-// workflowPath in place, matching the read source.
+// workflowPath in place, matching the read source. In-place writes are atomic:
+// the result is encoded to a temp file in the same directory first and renamed
+// over the original only on success, so a failed write never corrupts the file.
 func writeWorkflow(cw *ComfyWorkflow, workflowPath string) error {
-	var writer io.Writer
 	if workflowPath == "" {
-		writer = os.Stdout
-	} else {
-		file, err := os.Create(workflowPath)
-		if err != nil {
-			return fmt.Errorf("Unable to open workflow file for writing: %s: %v", workflowPath, err)
+		if err := cw.WriteOut(os.Stdout); err != nil {
+			return fmt.Errorf("I/O error writing out json workflow: %v", err)
 		}
-		defer file.Close()
-		writer = file
+		return nil
 	}
-	if err := cw.WriteOut(writer); err != nil {
+	dir, file := filepath.Split(workflowPath)
+	if dir == "" {
+		dir = "."
+	}
+	tmp, err := os.CreateTemp(dir, file+".tmp-")
+	if err != nil {
+		return fmt.Errorf("Unable to create temp file for writing %s: %v", workflowPath, err)
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		if tmp != nil {
+			tmp.Close()
+			os.Remove(tmpPath)
+			tmp = nil
+		}
+	}()
+	if err := cw.WriteOut(tmp); err != nil {
 		return fmt.Errorf("I/O error writing out json workflow: %v", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("Error closing temp file for %s: %v", workflowPath, err)
+	}
+	tmp = nil
+	if err := os.Rename(tmpPath, workflowPath); err != nil {
+		return fmt.Errorf("Error replacing %s: %v", workflowPath, err)
 	}
 	return nil
 }

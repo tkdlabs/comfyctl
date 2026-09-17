@@ -4,11 +4,51 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
 // firstTextInput returns the first markable text (non node-ref) input in a
 // workflow, so a round-trip test can mark a custom role on a string input.
+// TestWriteWorkflowAtomicOnFailure verifies the writeWorkflow failure path
+// (issue #10): when encoding fails, the original file is left byte-identical
+// and no temp file is left behind.
+func TestWriteWorkflowAtomicOnFailure(t *testing.T) {
+	const path = "testdata/api_wan2_7_i2v.json"
+	cw, err := openFile(t, path)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	// Force a WriteOut failure with a value the JSON encoder cannot produce.
+	cw.Raw["_unsupported_boom"] = make(chan int)
+
+	dst := copyWorkflowToTemp(t, path)
+	before, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read original: %v", err)
+	}
+	if err := writeWorkflow(&cw, dst); err == nil {
+		t.Fatal("expected writeWorkflow to fail on unencodable content")
+	}
+	after, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read after failed write: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("failed write modified the original file")
+	}
+	entries, err := os.ReadDir(filepath.Dir(dst))
+	if err != nil {
+		t.Fatalf("readdir: %v", err)
+	}
+	for _, e := range entries {
+		if strings.Contains(e.Name(), ".tmp-") {
+			t.Fatalf("temp file left behind: %s", e.Name())
+		}
+	}
+}
+
 func firstTextInput(cw ComfyWorkflow) (InputRef, bool) {
 	for _, ref := range FindAllNonRefInputs(cw) {
 		if ref.inputType == ComfyTextInput {
