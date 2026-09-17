@@ -26,6 +26,10 @@ The following <what> attributes are supported:
   batch:	int: batch size
   seed:		int: seed, or "random" to use random number. 
                      If multiple seeds found applies value to all.
+  checkpoint:	string: model checkpoint used
+  steps:	int: sampling steps
+  cfg:		number: cfg scale (float where the workflow uses one)
+  denoise:	number: denoise strength
 Any role marked with 'mark' (including custom ones) works the same way.`
 
 func cmdSet(args []string) error {

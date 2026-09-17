@@ -53,36 +53,48 @@ func TestGoldenDump(t *testing.T) {
 		{
 			file: "testdata/image_flux2_text_to_image.json",
 			want: `Found batch size: 1
+Failed to find cfg scale: Unable to find cfg in the workflow
+Found model checkpoint: flux2_dev_fp8mixed.safetensors
+Failed to find denoise strength: Unable to find denoise in the workflow
 Failed to find frames per second: Unable to find fps in the workflow
 Found height of output artifact: 1024
 Failed to find input image: Unable to find source image in the workflow
 Failed to find negative prompt: Unable to find negative prompt in the workflow
 Found positive prompt: high fashion, vintage couture, street photography, luxury fashion shoot, neo brutalist architecture, pastel paints
 Found seed: 1027111520328378
+Found sampling steps: 20
 Found width of output artifact: 1024
 `,
 		},
 		{
 			file: "testdata/image_flux2_text_to_image_9b.json",
 			want: `Found batch size: 1
+Found cfg scale: 5
+Found model checkpoint: flux-2-klein-base-9b-fp8.safetensors
+Failed to find denoise strength: Unable to find denoise in the workflow
 Failed to find frames per second: Unable to find fps in the workflow
 Found height of output artifact: 1024
 Failed to find input image: Unable to find source image in the workflow
 Found negative prompt: 
 Found positive prompt: A vintage motorcycle parked in front of a retro diner at sunset, warm orange and pink sky, neon signs glowing, 80s vintage photo style, film grain, warm color cast
 Found seed: 145965955694731
+Found sampling steps: 20
 Found width of output artifact: 1024
 `,
 		},
 		{
 			file: "testdata/video_hunyuan_video_1.5_720p_t2v.json",
 			want: `Found batch size: 1
+Found cfg scale: 6
+Found model checkpoint: hunyuanvideo1.5_720p_t2v_fp16.safetensors
+Found denoise strength: 1
 Found frames per second: 24
 Found height of output artifact: 720
 Failed to find input image: Unable to find source image in the workflow
 Found negative prompt: 
 Found positive prompt: A paper airplane released from the top of a skyscraper, gliding through urban canyons, crossing traffic, flying over streets, spiraling upward between buildings. The camera follows the paper airplane's perspective, shooting cityscape in first-person POV, finally flying toward the sunset, disappearing in golden light. Creative camera movement, free perspective, dreamlike colors.
 Found seed: 887963123424675
+Found sampling steps: 20
 Found width of output artifact: 1280
 `,
 		},

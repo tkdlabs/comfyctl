@@ -23,28 +23,37 @@ The following <What> attributes are supported. You can supply multiple <what>:
   fps:		output artifact's fps (may not work for image workflows)
   image:	input image for I2I or I2V workflows (assumes one input image)
   batch:	batch size set in the workflow
-  seed:		seed used to generate artifact`
+  seed:		seed used to generate artifact
+  checkpoint:	model checkpoint used
+  steps:	sampling steps
+  cfg:		cfg scale
+  denoise:	denoise strength`
 
 type roleDescriptor struct {
 	RoleText string
 }
 
 var PredefinedRoles = map[string]roleDescriptor{
-	"positive": {"positive prompt"},
-	"negative": {"negative prompt"},
-	"width":    {"width of output artifact"},
-	"height":   {"height of output artifact"},
-	"fps":      {"frames per second"},
-	"image":    {"input image"},
-	"batch":    {"batch size"},
-	"seed":     {"seed"},
+	"positive":   {"positive prompt"},
+	"negative":   {"negative prompt"},
+	"width":      {"width of output artifact"},
+	"height":     {"height of output artifact"},
+	"fps":        {"frames per second"},
+	"image":      {"input image"},
+	"batch":      {"batch size"},
+	"seed":       {"seed"},
+	"checkpoint": {"model checkpoint"},
+	"steps":      {"sampling steps"},
+	"cfg":        {"cfg scale"},
+	"denoise":    {"denoise strength"},
 }
 
 func cmdDump(args []string) error {
 	display := make(map[string]roleDescriptor)
 	for _, arg := range args {
 		switch arg {
-		case "positive", "negative", "width", "height", "batch", "fps", "image", "seed":
+		case "positive", "negative", "width", "height", "batch", "fps", "image", "seed",
+			"checkpoint", "steps", "cfg", "denoise":
 			display[arg] = PredefinedRoles[arg]
 		default:
 			display[arg] = roleDescriptor{fmt.Sprintf("custom role marker '%s'", arg)}

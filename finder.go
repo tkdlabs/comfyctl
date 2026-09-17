@@ -27,6 +27,14 @@ func findByRole(cw ComfyWorkflow, role string) ([]InputRef, error) {
 		return one(FindImage(cw))
 	case "batch":
 		return one(FindBatchSize(cw))
+	case "steps":
+		return one(FindSteps(cw))
+	case "cfg":
+		return one(FindCfg(cw))
+	case "denoise":
+		return one(FindDenoise(cw))
+	case "checkpoint":
+		return one(FindCheckpoint(cw))
 	default:
 		return nil, fmt.Errorf("unknown role: %s", role)
 	}
@@ -74,6 +82,54 @@ func FindWidth(workflow ComfyWorkflow) (InputRef, error) {
 
 func FindBatchSize(workflow ComfyWorkflow) (InputRef, error) {
 	return findScalarRole(workflow, "batch_size", "batch_size")
+}
+
+// FindSteps / FindCfg / FindDenoise cover the common sampling knobs: the
+// literal input names appear directly on KSampler/KSamplerAdvanced, CFGGuider,
+// Flux2Scheduler, and BasicScheduler across the corpus.
+func FindSteps(workflow ComfyWorkflow) (InputRef, error) {
+	return findScalarRole(workflow, "steps", "steps")
+}
+
+func FindCfg(workflow ComfyWorkflow) (InputRef, error) {
+	return findScalarRole(workflow, "cfg", "cfg")
+}
+
+func FindDenoise(workflow ComfyWorkflow) (InputRef, error) {
+	return findScalarRole(workflow, "denoise", "denoise")
+}
+
+// checkpointLoaders are the classes whose name-input unambiguously identifies
+// the main model. Anything else exposing `ckpt_name` (text-encoder / audio
+// loaders on some video templates) is a second-class hit below.
+var checkpointLoaders = []string{"CheckpointLoaderSimple", "UNETLoader", "CLIPLoader"}
+
+// FindCheckpoint locates the model checkpoint the workflow runs on. Loader
+// classes come first; other nodes with a `ckpt_name`/`unet_name` input follow
+// (templates that load separate text-encoder or audio-VAE checkpoints).
+func FindCheckpoint(workflow ComfyWorkflow) (InputRef, error) {
+	for _, key := range []string{"ckpt_name", "unet_name"} {
+		for _, k := range sortedNodeIDs(workflow) {
+			node := workflow.Nodes[k]
+			if !slices.Contains(checkpointLoaders, node.ClassType) {
+				continue
+			}
+			in, found := node.Inputs[key]
+			if found && in.Type == ComfyTextInput {
+				return InputRef{nodeId: k, inputId: key, inputType: ComfyTextInput}, nil
+			}
+		}
+	}
+	for _, key := range []string{"ckpt_name", "unet_name"} {
+		for _, k := range sortedNodeIDs(workflow) {
+			node := workflow.Nodes[k]
+			in, found := node.Inputs[key]
+			if found && in.Type == ComfyTextInput {
+				return InputRef{nodeId: k, inputId: key, inputType: ComfyTextInput}, nil
+			}
+		}
+	}
+	return InputRef{}, errors.New("Unable to find checkpoint in the workflow")
 }
 
 func FindFps(workflow ComfyWorkflow) (InputRef, error) {

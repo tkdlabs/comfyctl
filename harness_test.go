@@ -67,6 +67,10 @@ var finders = []finder{
 	{"fps", FindFps},
 	//	{"seed", FindSeed},
 	{"image", FindImage},
+	{"checkpoint", FindCheckpoint},
+	{"steps", FindSteps},
+	{"cfg", FindCfg},
+	{"denoise", FindDenoise},
 }
 
 // TestFindersReport is a non-failing characterization baseline. It prints a
