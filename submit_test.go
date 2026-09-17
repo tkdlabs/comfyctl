@@ -23,13 +23,22 @@ const submitWorkflowJSON = `{"1":{"class_type":"TestNode","inputs":{}}}`
 // audio, ...).
 type nodeCats map[string]map[string][]outputFile
 
-// mkHistory builds a /history/<id> body for the given prompt.
-func mkHistory(t *testing.T, promptID, status string, completed bool, cats nodeCats) string {
+// mkHistory builds a /history/<id> body for the given prompt. Any additional
+// args are embedded as status message tuples (e.g. a pre-marshaled
+// ["execution_error", {...}] pair).
+func mkHistory(t *testing.T, promptID, status string, completed bool, cats nodeCats, msgs ...string) string {
 	t.Helper()
+	args := make([]json.RawMessage, 0, len(msgs))
+	for _, m := range msgs {
+		args = append(args, json.RawMessage(m))
+	}
 	b, err := json.Marshal(map[string]any{
 		promptID: map[string]any{
 			"outputs": cats,
-			"status":  map[string]any{"status_str": status, "completed": completed},
+			"status": map[string]any{
+				"status_str": status, "completed": completed,
+				"messages": args,
+			},
 		},
 	})
 	if err != nil {
@@ -297,14 +306,36 @@ func TestSubmitPromptRejected(t *testing.T) {
 	}
 }
 
+// executionErrorMsg is a ["execution_error", {...}] tuple shaped like what a
+// real ComfyUI server reports when a node raises during execution.
+var executionErrorMsg = mustJSON([]any{
+	"execution_error",
+	map[string]any{
+		"node_type":         "VAEDecode",
+		"node_id":           "35",
+		"exception_type":    "OutOfMemoryError",
+		"exception_message": "CUDA out of memory during decode",
+		"traceback":         "  File \"nodes.py\", line 42\n",
+	},
+})
+
+func mustJSON(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
 // TestSubmitHistoryError: a completed history entry with status_str != success
-// surfaces as an error instead of downloading anything.
+// surfaces as an error instead of downloading anything, and execution_error
+// message tuples are surfaced with the failing node's details.
 func TestSubmitHistoryError(t *testing.T) {
 	m := newComfyMock(t, mockCfg{
 		promptID: "p1",
 		histories: []string{mkHistory(t, "p1", "error", true, nodeCats{
 			"35": {"images": {{Filename: "out.png", Type: "output"}}},
-		})},
+		}, executionErrorMsg)},
 	})
 	_, err := runSubmit(t, "--host", m.srv.URL, "-o", filepath.Join(t.TempDir(), "out"))
 	if err == nil {
@@ -312,6 +343,25 @@ func TestSubmitHistoryError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "did not succeed") {
 		t.Errorf("error = %v, want a did-not-succeed error", err)
+	}
+	for _, want := range []string{"VAEDecode", "OutOfMemoryError", "CUDA out of memory during decode"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to mention %q", err, want)
+		}
+	}
+}
+
+// TestSubmitNodeErrorsWithoutTrace: a failure whose history carries an
+// execution_error tuple still reports the node and exception even when the
+// status_str is a non-"error" string like "fail".
+func TestSubmitNodeErrorsOtherStatus(t *testing.T) {
+	m := newComfyMock(t, mockCfg{
+		promptID:  "p1",
+		histories: []string{mkHistory(t, "p1", "fail", true, nodeCats{}, executionErrorMsg)},
+	})
+	_, err := runSubmit(t, "--host", m.srv.URL, "-o", filepath.Join(t.TempDir(), "out"))
+	if err == nil || !strings.Contains(err.Error(), "node 35 (VAEDecode)") {
+		t.Fatalf("error = %v, want failing-node diagnostics", err)
 	}
 }
 

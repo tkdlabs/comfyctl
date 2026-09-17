@@ -194,9 +194,55 @@ func (c *comfyClient) submitPrompt(raw map[string]any, clientID string) (string,
 type historyEntry struct {
 	Outputs map[string]map[string]json.RawMessage `json:"outputs"`
 	Status  struct {
-		StatusStr string `json:"status_str"`
-		Completed bool   `json:"completed"`
+		StatusStr string            `json:"status_str"`
+		Completed bool              `json:"completed"`
+		Messages  []json.RawMessage `json:"messages"`
 	} `json:"status"`
+}
+
+// nodeError is one failed node execution, as reported by an
+// ["execution_error", {...}] message tuple in the history status.
+type nodeError struct {
+	NodeType         string `json:"node_type"`
+	NodeID           string `json:"node_id"`
+	ExceptionMessage string `json:"exception_message"`
+	ExceptionType    string `json:"exception_type"`
+	Traceback        string `json:"traceback"`
+}
+
+// nodeErrors extracts execution_error message tuples, which carry the failing
+// node's class, id, and exception details. Anything unparsable is skipped.
+func nodeErrors(entry historyEntry) []nodeError {
+	var errs []nodeError
+	for _, msg := range entry.Status.Messages {
+		var pair []json.RawMessage
+		if json.Unmarshal(msg, &pair) != nil || len(pair) != 2 {
+			continue
+		}
+		var name string
+		if json.Unmarshal(pair[0], &name) != nil || name != "execution_error" {
+			continue
+		}
+		var ne nodeError
+		if json.Unmarshal(pair[1], &ne) != nil {
+			continue
+		}
+		errs = append(errs, ne)
+	}
+	return errs
+}
+
+// reportNodeErrors prints one human-readable line per failed node (plus
+// tracebacks) to stderr, so a failed run points at the actual problem instead
+// of only reporting status_str.
+func reportNodeErrors(errs []nodeError) {
+	for _, ne := range errs {
+		fmt.Fprintf(os.Stderr, "error: node %s (%s): %s: %s\n",
+			ne.NodeID, ne.NodeType, ne.ExceptionType, ne.ExceptionMessage)
+		if ne.Traceback != "" {
+			fmt.Fprintln(os.Stderr, ne.Traceback)
+		}
+	}
 }
 
 // waitForOutputs polls /history/<promptID> until the prompt reaches a terminal
@@ -211,6 +257,13 @@ func (c *comfyClient) waitForOutputs(promptID string, timeout time.Duration) ([]
 		}
 		if found && entry.Status.Completed {
 			if entry.Status.StatusStr != "" && entry.Status.StatusStr != "success" {
+				if errs := nodeErrors(entry); len(errs) > 0 {
+					reportNodeErrors(errs)
+					first := fmt.Sprintf("node %s (%s): %s: %s",
+						errs[0].NodeID, errs[0].NodeType, errs[0].ExceptionType, errs[0].ExceptionMessage)
+					return nil, fmt.Errorf("workflow did not succeed (status: %s); %d node(s) failed; first: %s",
+						entry.Status.StatusStr, len(errs), first)
+				}
 				return nil, fmt.Errorf("workflow did not succeed (status: %s)", entry.Status.StatusStr)
 			}
 			return collectOutputs(entry), nil
