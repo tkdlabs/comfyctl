@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"maps"
 	"os"
@@ -10,10 +12,15 @@ import (
 )
 
 // TODO: rework
-const dumpUsage = `comfyctl dump <what> - tries to find workflow crucial data that can be overridden
+const dumpUsage = `comfyctl dump [flags] <what> - tries to find workflow crucial data that can be overridden
 
 Note: this uses best-effort search; roles marked with 'mark' take precedence.
 If no <what> is provided, tool outputs all attributes after trying.
+
+Flags:
+  --json   emit machine-readable JSON on stdout instead of prose. Marker notes
+           and resolution failures never pollute the data stream: unresolved
+           roles appear as "error" entries inside the object.
 
 The following <What> attributes are supported. You can supply multiple <what>:
   positive:	finds positive prompt
@@ -49,6 +56,17 @@ var PredefinedRoles = map[string]roleDescriptor{
 }
 
 func cmdDump(args []string) error {
+	fs := flag.NewFlagSet("dump", flag.ContinueOnError)
+	fs.Usage = func() { fmt.Fprintln(os.Stderr, dumpUsage) }
+	jsonFlag := fs.Bool("json", false, "emit machine-readable JSON on stdout")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return nil
+		}
+		return err
+	}
+	args = fs.Args()
+
 	display := make(map[string]roleDescriptor)
 	for _, arg := range args {
 		switch arg {
@@ -68,14 +86,22 @@ func cmdDump(args []string) error {
 		display = maps.Clone(PredefinedRoles)
 		extra_markers, err := cw.FindAllMarkedRoles()
 		if err != nil {
-			fmt.Printf("Error while scanning for marked roles, will stick to predefined ones: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error while scanning for marked roles, will stick to predefined ones: %v\n", err)
 		} else {
 			for _, role := range extra_markers {
 				display[role] = roleDescriptor{fmt.Sprintf("custom role marker '%s'", role)}
 			}
 		}
-		printMarkerConflicts(cw)
 	}
+
+	if *jsonFlag {
+		if err := dumpJSON(cw, display); err != nil {
+			return err
+		}
+		printMarkerConflicts(cw)
+		return nil
+	}
+	printMarkerConflicts(cw)
 
 	sortedDisplayKeys := slices.Sorted(maps.Keys(display))
 
@@ -97,22 +123,73 @@ func cmdDump(args []string) error {
 	return nil
 }
 
+// roleDumpEntry is one role's resolution result in dump --json output: either
+// the resolved value(s) plus the node inputs they live on, or an error string.
+// A single ref yields a scalar Value; multiple refs yield a list.
+type roleDumpEntry struct {
+	Value any            `json:"value,omitempty"`
+	Nodes []dumpLocation `json:"nodes,omitempty"`
+	Error string         `json:"error,omitempty"`
+}
+
+type dumpLocation struct {
+	Node  string `json:"id"`
+	Input string `json:"input"`
+}
+
+// dumpJSON resolves every requested role and encodes the results as a JSON
+// object on stdout. Errors are embedded per role, never written to stdout, so
+// the stream is safe to pipe into jq.
+func dumpJSON(cw ComfyWorkflow, display map[string]roleDescriptor) error {
+	out := make(map[string]roleDumpEntry, len(display))
+	for role := range display {
+		entry := roleDumpEntry{}
+		vals, err := cw.ResolveRole(role)
+		if err != nil {
+			out[role] = roleDumpEntry{Error: err.Error()}
+			continue
+		}
+		var values []any
+		for _, valref := range vals {
+			val, err := cw.Resolve(valref)
+			if err != nil {
+				entry.Error = fmt.Sprintf("%s (%s:%s): %v", display[role].RoleText, valref.nodeId, valref.inputId, err)
+				values = nil
+				break
+			}
+			values = append(values, val)
+			entry.Nodes = append(entry.Nodes, dumpLocation{Node: valref.nodeId, Input: valref.inputId})
+		}
+		if len(values) == 1 {
+			entry.Value = values[0]
+		} else if len(values) > 1 {
+			entry.Value = values
+		} else if entry.Error == "" {
+			entry.Error = "no values resolved"
+		}
+		out[role] = entry
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "    ")
+	return encoder.Encode(out)
+}
+
 // printMarkerConflicts reports marker uniqueness violations to stderr (notes,
 // not data): a role marked on more than one node, and markers pointing at a
 // missing input. Fixing them is an explicit `mark -d <role>` or `mark -f move`.
 func printMarkerConflicts(cw ComfyWorkflow) {
 	conflicts, err := cw.DetectMarkerConflicts()
 	if err != nil {
-		fmt.Printf("Error while checking marker conflicts: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error while checking marker conflicts: %v\n", err)
 		return
 	}
 	for _, c := range conflicts {
 		if len(c.Nodes) > 1 {
-			fmt.Printf("Note: role '%s' is marked on %d nodes (%s); use 'mark -d %s' then re-mark, or 'mark -f' to move.\n",
+			fmt.Fprintf(os.Stderr, "Note: role '%s' is marked on %d nodes (%s); use 'mark -d %s' then re-mark, or 'mark -f' to move.\n",
 				c.Role, len(c.Nodes), strings.Join(c.Nodes, ", "), c.Role)
 		}
 		if c.Dangling != "" {
-			fmt.Printf("Note: marker for role '%s' on node %s points at a missing input; use 'mark -d %s' to clear it.\n",
+			fmt.Fprintf(os.Stderr, "Note: marker for role '%s' on node %s points at a missing input; use 'mark -d %s' to clear it.\n",
 				c.Role, c.Dangling, c.Role)
 		}
 	}

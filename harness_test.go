@@ -642,10 +642,16 @@ func runRoles(t *testing.T, inputPath string) string {
 	}
 	defer out.Close()
 
-	oldIn, oldOut := os.Stdin, os.Stdout
-	os.Stdin, os.Stdout = in, out
+	errOut, err := os.CreateTemp(t.TempDir(), "roles-err-*.txt")
+	if err != nil {
+		t.Fatalf("temp err out: %v", err)
+	}
+	defer errOut.Close()
+
+	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
+	os.Stdin, os.Stdout, os.Stderr = in, out, errOut
 	err = cmdRoles(nil)
-	os.Stdin, os.Stdout = oldIn, oldOut
+	os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr
 	if err != nil {
 		t.Fatalf("cmdRoles: %v", err)
 	}
@@ -654,7 +660,13 @@ func runRoles(t *testing.T, inputPath string) string {
 	if err != nil {
 		t.Fatalf("read out: %v", err)
 	}
-	return string(b)
+	// Notes are printed to stderr per the stdout-carries-data-only
+	// convention; the capture recombines so assertions can check both.
+	nb, err := os.ReadFile(errOut.Name())
+	if err != nil {
+		t.Fatalf("read err out: %v", err)
+	}
+	return string(b) + string(nb)
 }
 
 func truncate(v any) string {

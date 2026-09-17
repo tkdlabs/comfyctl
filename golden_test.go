@@ -237,3 +237,91 @@ func TestGoldenDumpMarkers(t *testing.T) {
 		}
 	})
 }
+
+// TestGoldenDumpJSON locks in dump's --json contract for issue #6: stdout
+// carries only the JSON object; unresolved roles appear as "error" entries and
+// multi-node roles (seed) list their refs, so the stream is pipeable to jq
+// with no prose contamination.
+func TestGoldenDumpJSON(t *testing.T) {
+	cases := []struct {
+		file string
+		args []string
+		want string
+	}{
+		{
+			file: "testdata/image_flux2_text_to_image.json",
+			args: []string{"--json", "positive", "batch", "cfg"},
+			want: `{
+    "batch": {
+        "value": 1,
+        "nodes": [
+            {
+                "id": "98:47",
+                "input": "batch_size"
+            }
+        ]
+    },
+    "cfg": {
+        "error": "Unable to find cfg in the workflow"
+    },
+    "positive": {
+        "value": "high fashion, vintage couture, street photography, luxury fashion shoot, neo brutalist architecture, pastel paints",
+        "nodes": [
+            {
+                "id": "98:6",
+                "input": "text"
+            }
+        ]
+    }
+}
+`,
+		},
+		{
+			file: "testdata/templates-6-key-frames.json",
+			args: []string{"--json", "seed"},
+			want: `{
+    "seed": {
+        "value": [
+            106238756028535,
+            106238756028535,
+            106238756028535,
+            106238756028535,
+            106238756028535
+        ],
+        "nodes": [
+            {
+                "id": "140:57",
+                "input": "noise_seed"
+            },
+            {
+                "id": "228:222",
+                "input": "noise_seed"
+            },
+            {
+                "id": "245:239",
+                "input": "noise_seed"
+            },
+            {
+                "id": "262:256",
+                "input": "noise_seed"
+            },
+            {
+                "id": "279:273",
+                "input": "noise_seed"
+            }
+        ]
+    }
+}
+`,
+		},
+	}
+	for _, c := range cases {
+		name := strings.TrimSuffix(c.file[strings.LastIndex(c.file, "/")+1:], ".json")
+		t.Run(name, func(t *testing.T) {
+			got := runDump(t, c.file, c.args...)
+			if got := string(got); got != c.want {
+				t.Errorf("dump --json mismatch\ngot:\n%q\nwant:\n%q", got, c.want)
+			}
+		})
+	}
+}

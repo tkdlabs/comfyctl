@@ -62,15 +62,15 @@ func cmdRoles(args []string) error {
 
 	conflicts, err := cw.DetectMarkerConflicts()
 	if err != nil {
-		fmt.Printf("Note: unable to check marker conflicts: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Note: unable to check marker conflicts: %v\n", err)
 	}
 	for _, c := range conflicts {
 		if len(c.Nodes) > 1 {
-			fmt.Printf("Note: role '%s' is marked on %d nodes (%s); use 'mark -d %s' then re-mark, or 'mark -f' to move.\n",
+			fmt.Fprintf(os.Stderr, "Note: role '%s' is marked on %d nodes (%s); use 'mark -d %s' then re-mark, or 'mark -f' to move.\n",
 				c.Role, len(c.Nodes), strings.Join(c.Nodes, ", "), c.Role)
 		}
 		if c.Dangling != "" {
-			fmt.Printf("Note: marker for role '%s' on node %s points at a missing input; use 'mark -d %s' to clear it.\n",
+			fmt.Fprintf(os.Stderr, "Note: marker for role '%s' on node %s points at a missing input; use 'mark -d %s' to clear it.\n",
 				c.Role, c.Dangling, c.Role)
 		}
 	}

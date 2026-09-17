@@ -35,10 +35,16 @@ Multiple roles can be supplied.
 ```sh
 comfyctl dump            # all roles
 comfyctl dump seed width # just seed and width
+comfyctl dump --json | jq -r .positive.value
 ```
 
+With `--json` the output is a machine-readable object on stdout
+(`{"<role>": {"value": ..., "nodes": [{"id": ..., "input": ...]}}`), with
+unresolved roles reported as `"error"` entries — safe for scripting.
+
 Supported roles: `positive`, `negative`, `width`, `height`, `fps`, `image`,
-`batch`, `seed` — plus any [custom roles](#how-roles-work) you have marked.
+`batch`, `seed`, `checkpoint`, `steps`, `cfg`, `denoise` — plus any
+[custom roles](#how-roles-work) you have marked.
 
 ### set
 
@@ -53,9 +59,11 @@ cat workflow.json | comfyctl set seed random
 cat workflow.json | comfyctl set width 1024 | comfyctl set height 1024
 ```
 
-Integer roles (`width`, `height`, `fps`, `batch`, `seed`) accept `random` to
-pick a random value. If a role can't be found, run `comfyctl dump` first and
-consider [marking](#how-roles-work) it manually.
+The value is written according to the target input's type: numeric inputs take
+ints (and `random`), boolean inputs take `true`/`false`, text everything else.
+Node references are never overwritten. `random` works for any marked numeric
+role. If a role can't be found, run `comfyctl dump` first and consider
+[marking](#how-roles-work) it manually.
 
 ### mark
 
@@ -113,7 +121,9 @@ it with `mark -d <role>` and re-mark.
 ### submit
 
 Posts a workflow to ComfyUI, waits for it to complete, and downloads the
-output files.
+output files. When a run fails, `submit` prints the failing nodes — class,
+node id, and the exception message — so the cause is visible without digging
+through the ComfyUI console.
 
 ```sh
 cat workflow.json | comfyctl submit
